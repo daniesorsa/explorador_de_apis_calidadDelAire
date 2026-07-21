@@ -3,16 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Explorador Avanzado de APIs - Calidad del Aire</title>
-  <!-- Enlace a la hoja de estilos externa -->
+  <title>Explorador Avanzado de APIs - Calidad del Aire (Live Data)</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <div class="container">
   <div class="header">
-    <h2>Explorador de APIs - Monitoreo Ambiental</h2>
-    <!-- El evento onclick se manejará desde app.js -->
+    <h2>Explorador de APIs - Monitoreo Ambiental (Conexión Real)</h2>
     <button class="theme-toggle" id="btn-theme-toggle">🌓 Cambiar Tema</button>
   </div>
 
@@ -28,11 +26,7 @@
     <div class="left-col">
       <div class="card">
         <div class="info-header">
-          <div class="badges">
-            <span class="badge method">GET</span>
-            <span class="badge rate">1 Millón Puntos / Mes</span>
-          </div>
-          <a href="https://api.purpleair.com/" target="_blank" class="doc-link">Ver Documentación ↗</a>
+          <a href="https://api.purpleair.com/" target="_blank" class="doc-link">Ver Documentación de la API ↗</a>
         </div>
         
         <div class="row">
@@ -95,14 +89,14 @@
       <div class="code-block">
         <div class="btn-group">
           <button class="btn btn-copy" data-target="pa-url">Copiar URL</button>
-          <button class="btn primary btn-simulate" data-api="purpleair">Simular Petición ▶</button>
+          <button class="btn primary btn-simulate" data-api="purpleair">Ejecutar Petición Real ▶</button>
         </div>
-        <div class="code-title">Endpoint Generado (Claves Ocultas)</div>
+        <div class="code-title">Endpoint Final a Consultar</div>
         <div class="url-display" id="pa-url"></div>
       </div>
       <div class="code-block" style="margin-top: 1rem;">
-        <div class="code-title">Respuesta JSON (Simulada)</div>
-        <div class="json-viewer" id="pa-json">// Presiona "Simular Petición" para ver la estructura de respuesta</div>
+        <div class="code-title">Respuesta JSON (Datos Reales / Errores)</div>
+        <div class="json-viewer" id="pa-json">// Presiona "Ejecutar Petición Real" para traer datos vivos desde los servidores.</div>
       </div>
     </div>
   </div>
@@ -112,29 +106,17 @@
     <div class="left-col">
       <div class="card">
         <div class="info-header">
-          <div class="badges">
-            <span class="badge method">GET</span>
-            <span class="badge rate">10,000 Llamadas / Mes (Gratis)</span>
-          </div>
-          <a href="https://www.iqair.com/dashboards/api" target="_blank" class="doc-link">Ver Documentación ↗</a>
+          <a href="https://www.iqair.com/dashboards/api" target="_blank" class="doc-link">Ver Documentación de la API ↗</a>
         </div>
         <div class="row">
           <div class="field">
-            <label>Tipo de Búsqueda</label>
-            <select id="iq-mode">
-              <option value="nearest">Ciudad más cercana por Coordenadas (GPS)</option>
-              <option value="city">Búsqueda por Ciudad Específica</option>
+            <label>Seleccionar Ciudad (Las coordenadas se calculan solas)</label>
+            <!-- Dropdown estricto según requerimientos. Las coords se manejan en JS -->
+            <select id="iq-city-dropdown">
+              <option value="tegucigalpa">Tegucigalpa</option>
+              <option value="sps">San Pedro Sula</option>
             </select>
           </div>
-        </div>
-        <div class="row" id="iq-gps-row">
-          <div class="field"><label>Latitud</label><input type="number" id="iq-lat" value="14.0818" step="0.0001"></div>
-          <div class="field"><label>Longitud</label><input type="number" id="iq-lon" value="-87.2068" step="0.0001"></div>
-        </div>
-        <div class="row hidden" id="iq-city-row">
-          <div class="field"><label>País</label><input type="text" id="iq-country" value="Honduras"></div>
-          <div class="field"><label>Estado</label><input type="text" id="iq-state" value="Francisco Morazan"></div>
-          <div class="field"><label>Ciudad</label><input type="text" id="iq-city" value="Tegucigalpa"></div>
         </div>
       </div>
       <div id="iq-params"></div>
@@ -143,14 +125,14 @@
       <div class="code-block">
         <div class="btn-group">
           <button class="btn btn-copy" data-target="iq-url">Copiar URL</button>
-          <button class="btn primary btn-simulate" data-api="iqair">Simular Petición ▶</button>
+          <button class="btn primary btn-simulate" data-api="iqair">Ejecutar Petición Real ▶</button>
         </div>
-        <div class="code-title">Endpoint Generado (Claves Ocultas)</div>
+        <div class="code-title">Endpoint Final a Consultar</div>
         <div class="url-display" id="iq-url"></div>
       </div>
       <div class="code-block" style="margin-top: 1rem;">
-        <div class="code-title">Respuesta JSON (Simulada)</div>
-        <div class="json-viewer" id="iq-json">// Presiona "Simular Petición" para ver la estructura de respuesta</div>
+        <div class="code-title">Respuesta JSON (Datos Reales / Errores)</div>
+        <div class="json-viewer" id="iq-json">// Presiona "Ejecutar Petición Real" para traer datos vivos desde los servidores.</div>
       </div>
     </div>
   </div>
@@ -160,27 +142,17 @@
     <div class="left-col">
       <div class="card">
         <div class="info-header">
-          <div class="badges">
-            <span class="badge method">GET</span>
-            <span class="badge rate">Open Source / Ilimitado*</span>
-          </div>
-          <a href="https://docs.openaq.org/" target="_blank" class="doc-link">Ver Documentación ↗</a>
+          <a href="https://docs.openaq.org/" target="_blank" class="doc-link">Ver Documentación de la API ↗</a>
         </div>
         <div class="row">
           <div class="field">
-            <label>Endpoint</label>
-            <select id="oaq-mode">
-              <option value="locations">Listar Ubicaciones (Bounding Box)</option>
-              <option value="location">Detalle de Ubicación por ID</option>
-              <option value="latest">Últimas Mediciones de la Ubicación</option>
+            <label>Estación de Monitoreo / Ciudad</label>
+            <select id="oaq-loc-dropdown">
+              <!-- ID Oficial de TGU. El de SPS es ilustrativo -->
+              <option value="8118">Tegucigalpa (US Diplomatic Post)</option>
+              <option value="8119">San Pedro Sula (Estación Centro - ID Prueba)</option>
             </select>
           </div>
-        </div>
-        <div class="row" id="oaq-bbox-row">
-          <div class="field"><label>Bounding Box (lat1,lon1,lat2,lon2)</label><input type="text" id="oaq-bbox" value="13.95,-87.35,14.20,-87.10"></div>
-        </div>
-        <div class="row hidden" id="oaq-id-row">
-          <div class="field"><label>ID de la Ubicación (Location ID)</label><input type="number" id="oaq-locid" value="8118"></div>
         </div>
       </div>
       <div id="oaq-params"></div>
@@ -189,14 +161,14 @@
       <div class="code-block">
         <div class="btn-group">
           <button class="btn btn-copy" data-target="oaq-url">Copiar URL</button>
-          <button class="btn primary btn-simulate" data-api="openaq">Simular Petición ▶</button>
+          <button class="btn primary btn-simulate" data-api="openaq">Ejecutar Petición Real ▶</button>
         </div>
-        <div class="code-title">Endpoint Generado (Claves Ocultas)</div>
+        <div class="code-title">Endpoint Final a Consultar</div>
         <div class="url-display" id="oaq-url"></div>
       </div>
       <div class="code-block" style="margin-top: 1rem;">
-        <div class="code-title">Respuesta JSON (Simulada)</div>
-        <div class="json-viewer" id="oaq-json">// Presiona "Simular Petición" para ver la estructura de respuesta</div>
+        <div class="code-title">Respuesta JSON (Datos Reales / Errores)</div>
+        <div class="json-viewer" id="oaq-json">// Presiona "Ejecutar Petición Real" para traer datos vivos desde los servidores.</div>
       </div>
     </div>
   </div>
@@ -206,11 +178,7 @@
     <div class="left-col">
       <div class="card">
         <div class="info-header">
-          <div class="badges">
-            <span class="badge method">GET</span>
-            <span class="badge rate">Uso Justo (Requiere Token)</span>
-          </div>
-          <a href="https://app.airgradient.com/api" target="_blank" class="doc-link">Ver Documentación ↗</a>
+          <a href="https://app.airgradient.com/api" target="_blank" class="doc-link">Ver Documentación de la API ↗</a>
         </div>
         <div class="row">
           <div class="field">
@@ -244,14 +212,14 @@
       <div class="code-block">
         <div class="btn-group">
           <button class="btn btn-copy" data-target="ag-url">Copiar URL</button>
-          <button class="btn primary btn-simulate" data-api="airgradient">Simular Petición ▶</button>
+          <button class="btn primary btn-simulate" data-api="airgradient">Ejecutar Petición Real ▶</button>
         </div>
-        <div class="code-title">Endpoint Generado (Claves Ocultas)</div>
+        <div class="code-title">Endpoint Final a Consultar</div>
         <div class="url-display" id="ag-url"></div>
       </div>
       <div class="code-block" style="margin-top: 1rem;">
-        <div class="code-title">Respuesta JSON (Simulada)</div>
-        <div class="json-viewer" id="ag-json">// Presiona "Simular Petición" para ver la estructura de respuesta</div>
+        <div class="code-title">Respuesta JSON (Datos Reales / Errores)</div>
+        <div class="json-viewer" id="ag-json">// Asegúrate de poner tu Token en el archivo JS antes de ejecutar esta petición.</div>
       </div>
     </div>
   </div>
@@ -259,7 +227,6 @@
 
 <div id="toast" class="toast">URL copiada al portapapeles</div>
 
-<!-- Enlace a la lógica de JavaScript externa -->
 <script src="app.js"></script>
 </body>
 </html>

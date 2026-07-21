@@ -1,68 +1,92 @@
 /**
- * Lógica principal del Explorador de APIs.
- * Separa el control del DOM, la generación de endpoints y la simulación de respuestas.
+ * Lógica de conexión en TIEMPO REAL del Explorador de APIs.
+ * Incluye gestión de promesas, diccionarios de geolocalización y renderizado dinámico.
  */
 
-// Llaves de API mantenidas en código, pero no mostradas en UI para seguridad web.
+// LLAVES DE API REALES INTEGRADAS
 const KEYS = { 
   PA: 'AECECD5B-8518-11F1-9E30-4201AC1DC129', 
   IQ: '65948212-5b5d-4aa1-b507-5c547bced938', 
   OAQ: '15440168e9f1863ef9b080ce4b171c56e5364beb8ccf3ae2971763658a909f25', 
-  AG: 'YOUR_AIRGRADIENT_TOKEN' 
+  AG: 'YOUR_AIRGRADIENT_TOKEN' // Dejar lista. Reemplazar cuando se tenga el token real.
 };
 
-// Máscara de seguridad utilizada para evitar imprimir las llaves en el DOM
-const MASKED_KEY = '***_OCULTO_POR_SEGURIDAD_***';
+// ==========================================
+// DICCIONARIOS DE EXPANSIÓN (Para configuración manual)
+// ==========================================
 
-// --- CONTROLADORES DE EVENTOS DEL DOM ---
+/* 
+ * DICCIONARIO IQAIR: Mapeo de ciudad a coordenadas espaciales.
+ * Instrucción: "deja listo y documentado para agregar mas ciudades de forma manual"
+ * Para agregar más ciudades:
+ * 1. Agrega el <option value="NUEVACIUAD"> en el HTML
+ * 2. Agrega la clave aquí abajo con sus respectivas latitud y longitud.
+ */
+const IQAIR_CITIES_DB = {
+  "tegucigalpa": { lat: "14.0818", lon: "-87.2068" },
+  "sps": { lat: "15.5042", lon: "-88.0250" },
+  // Ejemplo de expansión futura:
+  // "comayagua": { lat: "14.4515", lon: "-87.6375" }
+};
+
+/* 
+ * DICCIONARIO OPENAQ: Mapeo referencial de IDs.
+ * Para agregar más: Busca el "Location ID" oficial en OpenAQ, agrégalo al HTML y a este registro.
+ */
+const OPENAQ_LOCATIONS_DB = {
+  "8118": "Tegucigalpa (US Diplomatic Post)",
+  "8119": "San Pedro Sula (ID Referencial)"
+};
+
+
+// ==========================================
+// CONTROLADORES DE DOM
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-theme-toggle').addEventListener('click', toggleTheme);
   
-  // Asignar eventos de pestañas
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', (e) => setApi(e.target.dataset.api));
   });
 
-  // Asignar eventos a botones de simulación y copiado
   document.querySelectorAll('.btn-copy').forEach(btn => {
     btn.addEventListener('click', (e) => copyText(e.target.dataset.target));
   });
   
+  // Asignamos el evento a la nueva función de petición real
   document.querySelectorAll('.btn-simulate').forEach(btn => {
-    btn.addEventListener('click', (e) => simulateRequest(e.target.dataset.api));
+    btn.addEventListener('click', (e) => executeRealRequest(e.target.dataset.api));
   });
 
-  // Asignar eventos 'change' o 'input' a los formularios dinámicos
   document.querySelectorAll('select, input').forEach(el => {
     el.addEventListener('input', updateUI);
     el.addEventListener('change', updateUI);
   });
 
-  // Inicializar UI
   updateUI();
 });
 
-// --- FUNCIONES UTILITARIAS ---
+// ==========================================
+// UTILIDADES VISUALES
+// ==========================================
 function toggleTheme() {
   const body = document.body;
-  const current = body.getAttribute('data-theme');
-  body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+  body.setAttribute('data-theme', body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 }
 
 function setApi(api) {
   document.querySelectorAll('.panel-api').forEach(panel => panel.classList.add('hidden'));
   document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-  
   document.getElementById(`panel-${api}`).classList.remove('hidden');
   document.querySelector(`.tab[data-api="${api}"]`).classList.add('active');
   updateUI();
 }
 
-function showToast(msg) {
+function showToast(msg, isError = false) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  t.className = `toast show ${isError ? 'error' : ''}`;
+  setTimeout(() => t.className = 'toast', 3500);
 }
 
 function copyText(id) {
@@ -82,15 +106,15 @@ function renderTable(title, data) {
   `;
 }
 
-// --- CONSTRUCTORES DE URL Y PARÁMETROS (USAN CLAVES ENMASCARADAS) ---
+// ==========================================
+// CONSTRUCTORES DE URL Y CABECERAS
+// ==========================================
 
 function buildPA() {
   const mode = document.getElementById('pa-mode').value;
   const sensor = document.getElementById('pa-sensor').value;
-  let url = '';
-  // Reemplazado KEYS.PA por MASKED_KEY en la visualización
-  let params = [];
-  let headers = [['X-API-Key', MASKED_KEY], ['Content-Type', 'application/json']];
+  let url = '', params = [];
+  let headers = [['X-API-Key', KEYS.PA], ['Content-Type', 'application/json']];
 
   if (mode === 'current') {
     url = `https://api.purpleair.com/v1/sensors/${sensor}?fields=name,pm2.5_atm,temperature,humidity`;
@@ -109,54 +133,37 @@ function buildPA() {
   }
   
   document.getElementById('pa-url').textContent = url;
-  document.getElementById('pa-params').innerHTML = renderTable('Headers Requeridos', headers) + renderTable('Parámetros URL', params);
+  document.getElementById('pa-params').innerHTML = renderTable('Headers', headers) + renderTable('Parámetros URL reales', params);
 }
 
 function buildIQ() {
-  const mode = document.getElementById('iq-mode').value;
-  let url = '', params = [];
+  // Aquí se extrae la lat/lon automáticamente desde el diccionario basándose en el dropdown.
+  const cityKey = document.getElementById('iq-city-dropdown').value;
+  const coords = IQAIR_CITIES_DB[cityKey];
   
-  if (mode === 'nearest') {
-    const lat = document.getElementById('iq-lat').value, lon = document.getElementById('iq-lon').value;
-    // Reemplazado KEYS.IQ por MASKED_KEY en la visualización
-    url = `http://api.airvisual.com/v2/nearest_city?lat=${lat}&lon=${lon}&key=${MASKED_KEY}`;
-    params = [['lat', lat], ['lon', lon], ['key', MASKED_KEY]];
-  } else {
-    const c = encodeURIComponent(document.getElementById('iq-city').value);
-    const s = encodeURIComponent(document.getElementById('iq-state').value);
-    const co = encodeURIComponent(document.getElementById('iq-country').value);
-    url = `http://api.airvisual.com/v2/city?city=${c}&state=${s}&country=${co}&key=${MASKED_KEY}`;
-    params = [['city', decodeURIComponent(c)], ['state', decodeURIComponent(s)], ['country', decodeURIComponent(co)], ['key', MASKED_KEY]];
-  }
+  // Utilizamos HTTPS para evitar bloqueos por Mixed Content
+  const url = `https://api.airvisual.com/v2/nearest_city?lat=${coords.lat}&lon=${coords.lon}&key=${KEYS.IQ}`;
+  const params = [['lat', coords.lat], ['lon', coords.lon], ['key', KEYS.IQ]];
+  
   document.getElementById('iq-url').textContent = url;
-  document.getElementById('iq-params').innerHTML = renderTable('Parámetros URL', params);
+  document.getElementById('iq-params').innerHTML = renderTable('Parámetros URL reales', params);
 }
 
 function buildOAQ() {
-  const mode = document.getElementById('oaq-mode').value;
-  const id = document.getElementById('oaq-locid').value;
-  let url = '', params = [];
-  // Reemplazado KEYS.OAQ por MASKED_KEY en la visualización
-  let headers = [['X-API-Key', MASKED_KEY]];
+  const id = document.getElementById('oaq-loc-dropdown').value;
+  let url = `https://api.openaq.org/v3/locations/${id}`;
+  const params = [['Location ID (Path)', id]];
+  const headers = [['X-API-Key', KEYS.OAQ]];
 
-  if (mode === 'locations') {
-    const bbox = document.getElementById('oaq-bbox').value;
-    url = `https://api.openaq.org/v3/locations?bbox=${bbox}&limit=100`;
-    params = [['bbox', bbox], ['limit', '100']];
-  } else {
-    url = `https://api.openaq.org/v3/locations/${id}` + (mode === 'latest' ? '/latest' : '');
-    params = [['Location ID (Path)', id]];
-  }
   document.getElementById('oaq-url').textContent = url;
-  document.getElementById('oaq-params').innerHTML = renderTable('Headers Requeridos', headers) + renderTable('Parámetros URL', params);
+  document.getElementById('oaq-params').innerHTML = renderTable('Headers', headers) + renderTable('Parámetros URL reales', params);
 }
 
 function buildAG() {
   const mode = document.getElementById('ag-mode').value;
   const id = document.getElementById('ag-locid').value;
   let url = '', params = [];
-  // Reemplazado KEYS.AG por MASKED_KEY en la visualización
-  let headers = [['Authorization', `Bearer ${MASKED_KEY}`]];
+  let headers = [['Authorization', `Bearer ${KEYS.AG}`]];
 
   if (mode === 'places') {
     url = `https://api.airgradient.com/public/api/v1/places`;
@@ -170,10 +177,9 @@ function buildAG() {
     params = [['type', b], ['from', f], ['to', t]];
   }
   document.getElementById('ag-url').textContent = url;
-  document.getElementById('ag-params').innerHTML = renderTable('Headers Requeridos', headers) + renderTable('Parámetros URL', params);
+  document.getElementById('ag-params').innerHTML = renderTable('Headers', headers) + renderTable('Parámetros URL reales', params);
 }
 
-// --- ACTUALIZADOR DE INTERFAZ GENERAL ---
 function updateUI() {
   const paMode = document.getElementById('pa-mode').value;
   document.getElementById('pa-sensor-row').classList.toggle('hidden', paMode === 'list');
@@ -181,14 +187,8 @@ function updateUI() {
   document.getElementById('pa-history-row').classList.toggle('hidden', paMode !== 'history');
   buildPA();
 
-  const iqMode = document.getElementById('iq-mode').value;
-  document.getElementById('iq-gps-row').classList.toggle('hidden', iqMode !== 'nearest');
-  document.getElementById('iq-city-row').classList.toggle('hidden', iqMode === 'nearest');
-  buildIQ();
+  buildIQ(); // Ya no necesita toggle de interfaces, porque solo hay un dropdown de ciudad
 
-  const oaqMode = document.getElementById('oaq-mode').value;
-  document.getElementById('oaq-bbox-row').classList.toggle('hidden', oaqMode !== 'locations');
-  document.getElementById('oaq-id-row').classList.toggle('hidden', oaqMode === 'locations');
   buildOAQ();
 
   const agMode = document.getElementById('ag-mode').value;
@@ -197,58 +197,68 @@ function updateUI() {
   buildAG();
 }
 
-// --- MOCKING: SIMULADOR DE RESPUESTAS ---
-// Al no hacer peticiones reales, devolvemos JSON estático con la estructura oficial.
-function simulateRequest(api) {
-  const responses = {
-    purpleair: {
-      "api_version": "V1.0.11-0.0.51",
-      "time_stamp": Math.floor(Date.now() / 1000),
-      "sensor": { 
-        "sensor_index": parseInt(document.getElementById('pa-sensor').value) || 36361, 
-        "name": "TGU Miraflores HSF 2", 
-        "pm2.5_atm": 22.4, 
-        "temperature": 78, 
-        "humidity": 45 
-      }
-    },
-    iqair: {
-      "status": "success",
-      "data": { 
-        "city": "Tegucigalpa", 
-        "state": "Francisco Morazan", 
-        "country": "Honduras", 
-        "current": { 
-          "pollution": { "ts": new Date().toISOString(), "aqius": 65, "mainus": "p2", "aqicn": 32, "maincn": "p2" }, 
-          "weather": { "ts": new Date().toISOString(), "tp": 26, "pr": 1012, "hu": 60, "ws": 3.1 } 
-        } 
-      }
-    },
-    openaq: {
-      "meta": { "name": "openaq-api", "license": "CC BY 4.0", "website": "api.openaq.org", "page": 1, "limit": 100, "found": 1 },
-      "results": [{ 
-        "id": 8118, "city": "Tegucigalpa", "name": "US Diplomatic Post: Tegucigalpa", "entity": "Governmental Organization", "country": "HN", 
-        "sources": [{"name": "AirNow", "url": "http://www.airnowapi.org"}], 
-        "parameters": [{"id": 2, "unit": "µg/m³", "count": 28453, "average": 14.2, "lastValue": 25.0, "parameter": "pm25", "displayName": "PM2.5 Mass"}] 
-      }]
-    },
-    airgradient: [
-      { 
-        "locationId": document.getElementById('ag-locid').value || "654321", 
-        "timestamp": new Date().toISOString(), 
-        "pm01": 8, "pm02": 15, "pm10": 18, 
-        "pm003Count": 1120, "atmp": 25.5, "rhum": 50, "rco2": 450, "tvoc": 120 
-      }
-    ]
-  };
-  
-  const targetId = `${api === 'purpleair' ? 'pa' : api === 'iqair' ? 'iq' : api === 'openaq' ? 'oaq' : 'ag'}-json`;
+// ==========================================
+// FETCH Y MANEJO DE ERRORES (PETICIONES REALES)
+// ==========================================
+
+/**
+ * Función asíncrona que realiza el llamado real HTTP en lugar de simularlo.
+ * Si ocurre un error de Red (CORS), un 404, o un límite de la API, se atrapa en el catch y se muestra explícitamente en el DOM.
+ */
+async function executeRealRequest(api) {
+  const prefix = api === 'purpleair' ? 'pa' : api === 'iqair' ? 'iq' : api === 'openaq' ? 'oaq' : 'ag';
+  const targetId = `${prefix}-json`;
   const el = document.getElementById(targetId);
-  el.textContent = "Obteniendo datos...";
+  const url = document.getElementById(`${prefix}-url`).textContent;
   
-  // Emulamos latencia de red para dar realismo a la herramienta de simulación
-  setTimeout(() => {
-    el.textContent = JSON.stringify(responses[api], null, 2);
-    showToast("Respuesta simulada generada");
-  }, 400);
+  el.classList.remove('error-text');
+  el.textContent = "Conectando al servidor y descargando datos...";
+
+  // Construcción de la petición HTTP
+  let options = { method: 'GET' };
+  
+  if (api === 'purpleair') {
+    options.headers = { 'X-API-Key': KEYS.PA };
+  } else if (api === 'openaq') {
+    options.headers = { 'X-API-Key': KEYS.OAQ };
+  } else if (api === 'airgradient') {
+    // Control preventivo de la llave de AirGradient.
+    if(KEYS.AG === 'YOUR_AIRGRADIENT_TOKEN') {
+      el.classList.add('error-text');
+      el.textContent = "Error: Configura tu token de AirGradient en el código fuente (variable KEYS.AG) antes de realizar la petición.";
+      showToast("Se requiere configuración de token", true);
+      return;
+    }
+    options.headers = { 'Authorization': `Bearer ${KEYS.AG}` };
+  }
+
+  // Ejecución del Data Fetching (Real-time data ingestion pipeline start)
+  try {
+    const response = await fetch(url, options);
+    
+    // Extracción de datos (pueden ser exitosos o contener mensajes de error de la API)
+    const data = await response.json();
+
+    if (!response.ok) {
+      // Forzamos un fallo si el HTTP status no es 200-299
+      throw new Error(`Error de API HTTP ${response.status}: ${JSON.stringify(data)}`);
+    }
+    
+    // Mostramos la data real extraída
+    el.textContent = JSON.stringify(data, null, 2);
+    showToast("Datos reales obtenidos exitosamente");
+
+  } catch (error) {
+    // Pipeline de Error Handling: Previene la falla de la app y visibiliza la causa.
+    el.classList.add('error-text');
+    let errorMessage = `Ocurrió un error ejecutando la petición:\n\n${error.message}\n\n`;
+    errorMessage += `-------------------------------------------\n`;
+    errorMessage += `Nota de Troubleshooting (Data Pipeline):\n`;
+    errorMessage += `- Verifica si hay bloqueos de CORS en la consola (F12).\n`;
+    errorMessage += `- Confirma que los límites de la API no se han excedido.\n`;
+    errorMessage += `- Comprueba que los parámetros enviados sean válidos para la región seleccionada.`;
+    
+    el.textContent = errorMessage;
+    showToast("Error en la conexión a la API", true);
+  }
 }
