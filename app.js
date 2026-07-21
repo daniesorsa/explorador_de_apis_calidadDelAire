@@ -1,43 +1,32 @@
 /**
  * Lógica de conexión en TIEMPO REAL del Explorador de APIs.
- * Incluye gestión de promesas, diccionarios de geolocalización y renderizado dinámico.
+ * Incluye Parsing tabular de JSON y descarga cruda con timestamps.
  */
 
-// LLAVES DE API REALES INTEGRADAS
 const KEYS = { 
   PA: 'AECECD5B-8518-11F1-9E30-4201AC1DC129', 
   IQ: '65948212-5b5d-4aa1-b507-5c547bced938', 
   OAQ: '15440168e9f1863ef9b080ce4b171c56e5364beb8ccf3ae2971763658a909f25', 
-  AG: 'YOUR_AIRGRADIENT_TOKEN' // Dejar lista. Reemplazar cuando se tenga el token real.
+  AG: 'YOUR_AIRGRADIENT_TOKEN' 
 };
 
-// ==========================================
-// DICCIONARIOS DE EXPANSIÓN (Para configuración manual)
-// ==========================================
-
-/* 
- * DICCIONARIO IQAIR: Mapeo de ciudad a coordenadas espaciales.
- * Instrucción: "deja listo y documentado para agregar mas ciudades de forma manual"
- * Para agregar más ciudades:
- * 1. Agrega el <option value="NUEVACIUAD"> en el HTML
- * 2. Agrega la clave aquí abajo con sus respectivas latitud y longitud.
- */
 const IQAIR_CITIES_DB = {
   "tegucigalpa": { lat: "14.0818", lon: "-87.2068" },
-  "sps": { lat: "15.5042", lon: "-88.0250" },
-  // Ejemplo de expansión futura:
-  // "comayagua": { lat: "14.4515", lon: "-87.6375" }
+  "sps": { lat: "15.5042", lon: "-88.0250" }
 };
 
-/* 
- * DICCIONARIO OPENAQ: Mapeo referencial de IDs.
- * Para agregar más: Busca el "Location ID" oficial en OpenAQ, agrégalo al HTML y a este registro.
- */
 const OPENAQ_LOCATIONS_DB = {
   "8118": "Tegucigalpa (US Diplomatic Post)",
   "8119": "San Pedro Sula (ID Referencial)"
 };
 
+// CACHÉ EN MEMORIA: Almacena las respuestas JSON para su posterior descarga.
+window.apiDataCache = {
+    purpleair: null,
+    iqair: null,
+    openaq: null,
+    airgradient: null
+};
 
 // ==========================================
 // CONTROLADORES DE DOM
@@ -53,9 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', (e) => copyText(e.target.dataset.target));
   });
   
-  // Asignamos el evento a la nueva función de petición real
   document.querySelectorAll('.btn-simulate').forEach(btn => {
     btn.addEventListener('click', (e) => executeRealRequest(e.target.dataset.api));
+  });
+
+  // Evento asignado al botón de descargar JSON crudo
+  document.querySelectorAll('.btn-download').forEach(btn => {
+    btn.addEventListener('click', (e) => downloadJSON(e.target.dataset.api));
   });
 
   document.querySelectorAll('select, input').forEach(el => {
@@ -67,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
-// UTILIDADES VISUALES
+// UTILIDADES
 // ==========================================
 function toggleTheme() {
   const body = document.body;
@@ -94,6 +87,10 @@ function copyText(id) {
   showToast('¡URL copiada exitosamente!');
 }
 
+function getTodayStr() {
+    return new Date().toISOString().split('T')[0];
+}
+
 function renderTable(title, data) {
   if (!data || !data.length) return '';
   return `
@@ -107,43 +104,48 @@ function renderTable(title, data) {
 }
 
 // ==========================================
-// CONSTRUCTORES DE URL Y CABECERAS
+// CONSTRUCTORES DE URL (SIN CABECERAS, EXPANSIÓN TOTAL DE PARÁMETROS)
 // ==========================================
 
 function buildPA() {
   const mode = document.getElementById('pa-mode').value;
   const sensor = document.getElementById('pa-sensor').value;
   let url = '', params = [];
-  let headers = [['X-API-Key', KEYS.PA], ['Content-Type', 'application/json']];
+  
+  // EXPANSIÓN DE VARIABLES: Incluyendo todos los parámetros climáticos funcionales para IA/Data Science
+  const ALL_FIELDS = 'name,pm1.0,pm2.5_atm,pm2.5_cf_1,pm10.0_atm,temperature,humidity,pressure,voc,ozone1';
 
   if (mode === 'current') {
-    url = `https://api.purpleair.com/v1/sensors/${sensor}?fields=name,pm2.5_atm,temperature,humidity`;
-    params = [['fields', 'name,pm2.5_atm,temperature,humidity']];
+    url = `https://api.purpleair.com/v1/sensors/${sensor}?fields=${ALL_FIELDS}`;
+    params = [['fields', ALL_FIELDS]];
   } else if (mode === 'history') {
-    const s = document.getElementById('pa-start').value;
-    const e = document.getElementById('pa-end').value;
-    const a = document.getElementById('pa-avg').value;
-    url = `https://api.purpleair.com/v1/sensors/${sensor}/history?fields=pm2.5_atm&start_timestamp=${s}&end_timestamp=${e}&average=${a}`;
-    params = [['fields', 'pm2.5_atm'], ['start_timestamp', s], ['end_timestamp', e], ['average', a]];
+    const s = document.getElementById('pa-start').value, e = document.getElementById('pa-end').value, a = document.getElementById('pa-avg').value;
+    url = `https://api.purpleair.com/v1/sensors/${sensor}/history?fields=${ALL_FIELDS}&start_timestamp=${s}&end_timestamp=${e}&average=${a}`;
+    params = [['fields', ALL_FIELDS], ['start_timestamp', s], ['end_timestamp', e], ['average', a]];
   } else {
     const r = document.getElementById('pa-region').value;
     const [nwlat, nwlng, selat, selng] = r === 'tgu' ? ['14.20','-87.35','13.95','-87.10'] : ['15.60','-88.10','15.40','-87.90'];
-    url = `https://api.purpleair.com/v1/sensors?fields=sensor_index,pm2.5_atm&nwlat=${nwlat}&nwlng=${nwlng}&selat=${selat}&selng=${selng}`;
-    params = [['fields', 'sensor_index,pm2.5_atm'], ['nwlat', nwlat], ['nwlng', nwlng], ['selat', selat], ['selng', selng]];
+    url = `https://api.purpleair.com/v1/sensors?fields=sensor_index,${ALL_FIELDS}&nwlat=${nwlat}&nwlng=${nwlng}&selat=${selat}&selng=${selng}`;
+    params = [['fields', `sensor_index,${ALL_FIELDS}`], ['nwlat', nwlat], ['nwlng', nwlng], ['selat', selat], ['selng', selng]];
   }
   
+  params.push(['Fecha de Consulta', getTodayStr()]);
   document.getElementById('pa-url').textContent = url;
-  document.getElementById('pa-params').innerHTML = renderTable('Headers', headers) + renderTable('Parámetros URL reales', params);
+  document.getElementById('pa-params').innerHTML = renderTable('Parámetros URL reales (Completos)', params);
 }
 
 function buildIQ() {
-  // Aquí se extrae la lat/lon automáticamente desde el diccionario basándose en el dropdown.
   const cityKey = document.getElementById('iq-city-dropdown').value;
   const coords = IQAIR_CITIES_DB[cityKey];
   
-  // Utilizamos HTTPS para evitar bloqueos por Mixed Content
   const url = `https://api.airvisual.com/v2/nearest_city?lat=${coords.lat}&lon=${coords.lon}&key=${KEYS.IQ}`;
-  const params = [['lat', coords.lat], ['lon', coords.lon], ['key', KEYS.IQ]];
+  const params = [
+    ['lat', coords.lat], 
+    ['lon', coords.lon], 
+    ['key', KEYS.IQ], 
+    ['Fecha de Consulta', getTodayStr()],
+    ['Variables Devueltas (Implícitas)', 'Temperatura, Humedad, Presión, Viento (Vel/Dir), AQI']
+  ];
   
   document.getElementById('iq-url').textContent = url;
   document.getElementById('iq-params').innerHTML = renderTable('Parámetros URL reales', params);
@@ -152,32 +154,36 @@ function buildIQ() {
 function buildOAQ() {
   const id = document.getElementById('oaq-loc-dropdown').value;
   let url = `https://api.openaq.org/v3/locations/${id}`;
-  const params = [['Location ID (Path)', id]];
-  const headers = [['X-API-Key', KEYS.OAQ]];
+  const params = [
+      ['Location ID (Path)', id], 
+      ['Fecha de Consulta', getTodayStr()],
+      ['Variables Devueltas', 'Extrae todos los parámetros monitoreados por la estación (PM2.5, PM10, BC, SO2, O3, etc.)']
+  ];
 
   document.getElementById('oaq-url').textContent = url;
-  document.getElementById('oaq-params').innerHTML = renderTable('Headers', headers) + renderTable('Parámetros URL reales', params);
+  document.getElementById('oaq-params').innerHTML = renderTable('Parámetros URL reales', params);
 }
 
 function buildAG() {
   const mode = document.getElementById('ag-mode').value;
   const id = document.getElementById('ag-locid').value;
   let url = '', params = [];
-  let headers = [['Authorization', `Bearer ${KEYS.AG}`]];
 
   if (mode === 'places') {
     url = `https://api.airgradient.com/public/api/v1/places`;
   } else if (mode === 'current') {
     url = `https://api.airgradient.com/public/api/v1/locations/${id}/measures/current`;
   } else {
-    const b = document.getElementById('ag-bucket').value;
-    const f = document.getElementById('ag-from').value;
-    const t = document.getElementById('ag-to').value;
+    const b = document.getElementById('ag-bucket').value, f = document.getElementById('ag-from').value, t = document.getElementById('ag-to').value;
     url = `https://api.airgradient.com/public/api/v1/locations/${id}/measures?type=${b}&from=${f}&to=${t}`;
     params = [['type', b], ['from', f], ['to', t]];
   }
+  
+  params.push(['Fecha de Consulta', getTodayStr()]);
+  params.push(['Variables Soportadas', 'pm01, pm02 (PM2.5), pm10, atmp (Temp), rhum (Humedad), rco2, tvoc, nox']);
+
   document.getElementById('ag-url').textContent = url;
-  document.getElementById('ag-params').innerHTML = renderTable('Headers', headers) + renderTable('Parámetros URL reales', params);
+  document.getElementById('ag-params').innerHTML = renderTable('Parámetros URL reales', params);
 }
 
 function updateUI() {
@@ -187,8 +193,7 @@ function updateUI() {
   document.getElementById('pa-history-row').classList.toggle('hidden', paMode !== 'history');
   buildPA();
 
-  buildIQ(); // Ya no necesita toggle de interfaces, porque solo hay un dropdown de ciudad
-
+  buildIQ(); 
   buildOAQ();
 
   const agMode = document.getElementById('ag-mode').value;
@@ -198,67 +203,166 @@ function updateUI() {
 }
 
 // ==========================================
+// PARSER DE DATOS: DE JSON A TABLA HTML
+// ==========================================
+function buildDataTable(api, data) {
+    let rows = [];
+    try {
+        if (api === 'purpleair') {
+            const s = data.sensor || data.data; // Adapta si es histórico o current
+            if(!s) throw new Error("Estructura 'sensor' no encontrada.");
+            
+            const dict = {
+                "name": "Identificador de Estación",
+                "pm1.0": "Masa PM 1.0 (µg/m³)",
+                "pm2.5_atm": "Masa PM 2.5 Ambiental (µg/m³)",
+                "pm10.0_atm": "Masa PM 10.0 Ambiental (µg/m³)",
+                "temperature": "Temperatura Local (°F)",
+                "humidity": "Humedad Relativa (%)",
+                "pressure": "Presión Atmosférica (mb)",
+                "voc": "Compuestos Orgánicos Volátiles (VOC)",
+                "ozone1": "Ozono Estimado (O3)"
+            };
+            
+            for (let key in dict) {
+                if (s[key] !== undefined) rows.push(`<tr><td>${dict[key]}</td><td>${s[key]}</td></tr>`);
+            }
+        } 
+        else if (api === 'iqair') {
+            const w = data.data.current.weather;
+            const p = data.data.current.pollution;
+            
+            rows.push(`<tr><td>Temperatura Ambiente (°C)</td><td>${w.tp}</td></tr>`);
+            rows.push(`<tr><td>Humedad Relativa (%)</td><td>${w.hu}</td></tr>`);
+            rows.push(`<tr><td>Presión Atmosférica (hPa)</td><td>${w.pr}</td></tr>`);
+            rows.push(`<tr><td>Velocidad del Viento (m/s)</td><td>${w.ws}</td></tr>`);
+            rows.push(`<tr><td>Dirección del Viento (°)</td><td>${w.wd}</td></tr>`);
+            rows.push(`<tr><td>Índice de Calidad (AQI US)</td><td>${p.aqius}</td></tr>`);
+            rows.push(`<tr><td>Contaminante Principal Causante</td><td>${p.mainus}</td></tr>`);
+        } 
+        else if (api === 'openaq') {
+            const paramsList = data.results[0].parameters;
+            paramsList.forEach(p => {
+                rows.push(`<tr><td>${p.displayName || p.parameter.toUpperCase()}</td><td>${p.lastValue} ${p.unit}</td></tr>`);
+            });
+        } 
+        else if (api === 'airgradient') {
+            // AirGradient puede devolver un array (histórico) o un objeto (current)
+            const d = Array.isArray(data) ? data[data.length - 1] : data; 
+            
+            const dict = {
+                "pm01": "Masa PM 1.0 (µg/m³)",
+                "pm02": "Masa PM 2.5 (µg/m³)",
+                "pm10": "Masa PM 10.0 (µg/m³)",
+                "atmp": "Temperatura Interna (°C)",
+                "rhum": "Humedad Relativa (%)",
+                "rco2": "Dióxido de Carbono (ppm)",
+                "tvoc": "Compuestos Orgánicos Volátiles Totales",
+                "nox": "Óxidos de Nitrógeno Index"
+            };
+            
+            for (let key in dict) {
+                if (d[key] !== undefined) rows.push(`<tr><td>${dict[key]}</td><td>${d[key]}</td></tr>`);
+            }
+        }
+    } catch(e) {
+        return `<p class="error-text">Error transformando el JSON a Matriz: ${e.message}</p>`;
+    }
+
+    if (rows.length === 0) return `<p>Petición exitosa, pero no se encontraron los campos esperados en la raíz del JSON.</p>`;
+
+    return `<table class="data-table">
+              <thead><tr><th>Variable Ambiental</th><th>Valor Reportado (Último Registro)</th></tr></thead>
+              <tbody>${rows.join('')}</tbody>
+            </table>`;
+}
+
+// ==========================================
+// DESCARGA DE JSON CRUDO
+// ==========================================
+function downloadJSON(api) {
+    const data = window.apiDataCache[api];
+    if (!data) {
+        showToast("No hay datos en memoria para descargar.", true);
+        return;
+    }
+
+    const now = new Date();
+    // Formato de fecha y hora requerido
+    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS
+    const filename = `${api}_${dateStr}_${timeStr}.json`;
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// ==========================================
 // FETCH Y MANEJO DE ERRORES (PETICIONES REALES)
 // ==========================================
-
-/**
- * Función asíncrona que realiza el llamado real HTTP en lugar de simularlo.
- * Si ocurre un error de Red (CORS), un 404, o un límite de la API, se atrapa en el catch y se muestra explícitamente en el DOM.
- */
 async function executeRealRequest(api) {
   const prefix = api === 'purpleair' ? 'pa' : api === 'iqair' ? 'iq' : api === 'openaq' ? 'oaq' : 'ag';
-  const targetId = `${prefix}-json`;
+  const targetId = `${prefix}-table`;
+  const btnDownloadId = `btn-dl-${api}`;
+  
   const el = document.getElementById(targetId);
+  const btnDownload = document.getElementById(btnDownloadId);
   const url = document.getElementById(`${prefix}-url`).textContent;
   
   el.classList.remove('error-text');
-  el.textContent = "Conectando al servidor y descargando datos...";
+  el.innerHTML = "<p>Iniciando Ingestión de Datos...</p>";
+  btnDownload.classList.add('hidden'); // Ocultar botón de descarga durante la carga
 
-  // Construcción de la petición HTTP
   let options = { method: 'GET' };
   
-  if (api === 'purpleair') {
-    options.headers = { 'X-API-Key': KEYS.PA };
-  } else if (api === 'openaq') {
-    options.headers = { 'X-API-Key': KEYS.OAQ };
-  } else if (api === 'airgradient') {
-    // Control preventivo de la llave de AirGradient.
+  if (api === 'purpleair') options.headers = { 'X-API-Key': KEYS.PA };
+  else if (api === 'openaq') options.headers = { 'X-API-Key': KEYS.OAQ };
+  else if (api === 'airgradient') {
     if(KEYS.AG === 'YOUR_AIRGRADIENT_TOKEN') {
-      el.classList.add('error-text');
-      el.textContent = "Error: Configura tu token de AirGradient en el código fuente (variable KEYS.AG) antes de realizar la petición.";
-      showToast("Se requiere configuración de token", true);
+      el.innerHTML = "<p class='error-text'>Error: Token de AirGradient requerido en código fuente.</p>";
       return;
     }
     options.headers = { 'Authorization': `Bearer ${KEYS.AG}` };
   }
 
-  // Ejecución del Data Fetching (Real-time data ingestion pipeline start)
   try {
     const response = await fetch(url, options);
-    
-    // Extracción de datos (pueden ser exitosos o contener mensajes de error de la API)
     const data = await response.json();
 
     if (!response.ok) {
-      // Forzamos un fallo si el HTTP status no es 200-299
       throw new Error(`Error de API HTTP ${response.status}: ${JSON.stringify(data)}`);
     }
     
-    // Mostramos la data real extraída
-    el.textContent = JSON.stringify(data, null, 2);
-    showToast("Datos reales obtenidos exitosamente");
+    // 1. Guardar el JSON crudo en caché global para habilitar la descarga fiel
+    window.apiDataCache[api] = data;
+    
+    // 2. Transformar los datos a formato Tabular
+    el.innerHTML = buildDataTable(api, data);
+    
+    // 3. Habilitar la descarga
+    btnDownload.classList.remove('hidden');
+    showToast("Datos estructurados en tabla exitosamente");
 
   } catch (error) {
-    // Pipeline de Error Handling: Previene la falla de la app y visibiliza la causa.
     el.classList.add('error-text');
-    let errorMessage = `Ocurrió un error ejecutando la petición:\n\n${error.message}\n\n`;
-    errorMessage += `-------------------------------------------\n`;
-    errorMessage += `Nota de Troubleshooting (Data Pipeline):\n`;
-    errorMessage += `- Verifica si hay bloqueos de CORS en la consola (F12).\n`;
-    errorMessage += `- Confirma que los límites de la API no se han excedido.\n`;
-    errorMessage += `- Comprueba que los parámetros enviados sean válidos para la región seleccionada.`;
-    
-    el.textContent = errorMessage;
-    showToast("Error en la conexión a la API", true);
+    el.innerHTML = `
+        <p><strong>Fallo en la petición HTTP:</strong> ${error.message}</p>
+        <hr style="border-color:#334155; margin: 10px 0;">
+        <p><strong>Troubleshooting:</strong></p>
+        <ul style="margin: 0; padding-left: 20px;">
+            <li>Verifica bloqueos de CORS en la consola de tu navegador.</li>
+            <li>Revisa límites de Rate Limit de la cuenta.</li>
+            <li>Revisa que el ID o parámetros consultados existan en el sistema remoto.</li>
+        </ul>
+    `;
+    showToast("Error en la extracción de datos", true);
   }
 }
