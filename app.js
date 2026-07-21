@@ -1,8 +1,3 @@
-/**
- * Lógica de conexión en TIEMPO REAL del Explorador de APIs.
- * Incluye evasión estricta de CORS mediante uso de v2 y parseo de Data Science.
- */
-
 const KEYS = { 
   PA: 'AECECD5B-8518-11F1-9E30-4201AC1DC129', 
   IQ: '65948212-5b5d-4aa1-b507-5c547bced938', 
@@ -82,7 +77,6 @@ function updateClocks() {
   const dateStr = now.toLocaleDateString('es-HN');
   const timeStr = now.toLocaleTimeString('es-HN');
   
-  // Se actualizan simultáneamente los 4 bloques de información temporal
   ['pa', 'iq', 'oaq', 'ag'].forEach(prefix => {
       const dateEl = document.getElementById(`${prefix}-date-display`);
       const timeEl = document.getElementById(`${prefix}-time-display`);
@@ -92,7 +86,7 @@ function updateClocks() {
 }
 
 // ==========================================
-// CONSTRUCTORES DE URL (Limpios, sin tablas de parámetros extra)
+// CONSTRUCTORES DE URL
 // ==========================================
 
 function buildPA() {
@@ -125,8 +119,8 @@ function buildIQ() {
 
 function buildOAQ() {
   const id = document.getElementById('oaq-loc-dropdown').value;
-  // SOLUCIÓN CORS: Usar API v2. La versión 2 permite peticiones públicas sin API key preflight.
-  const url = `https://api.openaq.org/v2/locations/${id}`;
+  // Regresamos a la v3 oficial de OpenAQ
+  const url = `https://api.openaq.org/v3/locations/${id}`;
   document.getElementById('oaq-url').textContent = url;
 }
 
@@ -193,18 +187,30 @@ function buildDataTable(api, data) {
             rows.push(`<tr><td>Contaminante Principal</td><td>${p.mainus}</td></tr>`);
         } 
         else if (api === 'openaq') {
-            // Adaptado para el formato de OpenAQ v2
+            // Estructura actualizada a la v3
             const locData = data.results[0];
             rows.push(`<tr><td>ID de Estación</td><td>${locData.id}</td></tr>`);
-            rows.push(`<tr><td>Ciudad</td><td>${locData.city}</td></tr>`);
+            rows.push(`<tr><td>Nombre de Estación</td><td>${locData.name}</td></tr>`);
+            
+            // Las coordenadas en v3 vienen dentro del objeto geometry o boundingBox
             if(locData.coordinates) {
                 rows.push(`<tr><td>Latitud Espacial</td><td>${locData.coordinates.latitude}</td></tr>`);
                 rows.push(`<tr><td>Longitud Espacial</td><td>${locData.coordinates.longitude}</td></tr>`);
+            } else if (locData.bounds) {
+                rows.push(`<tr><td>Límites Geográficos</td><td>${locData.bounds.join(', ')}</td></tr>`);
             }
-            const paramsList = locData.parameters;
-            paramsList.forEach(p => {
-                rows.push(`<tr><td>${p.displayName || p.parameter.toUpperCase()}</td><td>${p.lastValue} ${p.unit}</td></tr>`);
-            });
+            
+            // En v3 los parámetros vienen en un array diferente
+            if (locData.parameters && Array.isArray(locData.parameters)) {
+                locData.parameters.forEach(p => {
+                    rows.push(`<tr><td>${p.displayName || p.parameter.toUpperCase()}</td><td>${p.lastValue} ${p.unit || ''}</td></tr>`);
+                });
+            } else if (locData.sensors && Array.isArray(locData.sensors)) {
+                 locData.sensors.forEach(s => {
+                    const latest = s.latest || {};
+                    rows.push(`<tr><td>${s.parameter.displayName || s.parameter.name.toUpperCase()}</td><td>${latest.value || 'N/A'} ${s.parameter.units || ''}</td></tr>`);
+                });
+            }
         } 
         else if (api === 'airgradient') {
             const d = Array.isArray(data) ? data[data.length - 1] : data; 
@@ -217,8 +223,8 @@ function buildDataTable(api, data) {
         }
     } catch(e) { return `<p class="error-text">Error transformando JSON: ${e.message}</p>`; }
 
-    if (rows.length === 0) return `<p>Petición exitosa, pero no se encontraron datos.</p>`;
-    return `<table class="data-table"><thead><tr><th>Variable / Feature</th><th>Valor (Última Observación)</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+    if (rows.length === 0) return `<p>Petición exitosa, pero no se encontraron datos de sensores.</p>`;
+    return `<table class="data-table"><thead><tr><th>Variable</th><th>Valor Reportado</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
 }
 
 function downloadJSON(api) {
@@ -235,26 +241,34 @@ function downloadJSON(api) {
 }
 
 // ==========================================
-// EJECUCIÓN HTTP (CON EVASIÓN DE CORS PARA OPENAQ)
+// EJECUCIÓN HTTP (CON PROXY CORS INTEGRADO)
 // ==========================================
 async function executeRealRequest(api) {
   const prefix = api === 'purpleair' ? 'pa' : api === 'iqair' ? 'iq' : api === 'openaq' ? 'oaq' : 'ag';
   const el = document.getElementById(`${prefix}-table`);
   const btnDownload = document.getElementById(`btn-dl-${api}`);
-  const url = document.getElementById(`${prefix}-url`).textContent;
+  let url = document.getElementById(`${prefix}-url`).textContent;
   
   el.classList.remove('error-text');
-  el.innerHTML = "<p>Iniciando Ingestión de Datos...</p>";
+  el.innerHTML = "<p>Iniciando Extracción de Datos...</p>";
   btnDownload.classList.add('hidden'); 
 
   let options = { method: 'GET', headers: {} };
   
-  if (api === 'purpleair') options.headers['X-API-Key'] = KEYS.PA; 
+  if (api === 'purpleair') {
+      options.headers['X-API-Key'] = KEYS.PA; 
+  } 
   else if (api === 'openaq') {
-      // Intencionadamente vacío: Usamos v2 la cual soporta acceso público origin *
+      // 1. Restauramos la llave en las cabeceras porque OpenAQ la exige.
+      options.headers['X-API-Key'] = KEYS.OAQ;
+      
+      // 2. SOLUCIÓN CORS: Usamos un proxy público transparente para envolver la URL.
+      // Esto hace que el proxy se conecte a OpenAQ por ti y le pase los datos al navegador,
+      // evadiendo por completo el bloqueo de seguridad.
+      url = 'https://corsproxy.io/?' + encodeURIComponent(url);
   } 
   else if (api === 'airgradient') {
-      if(KEYS.AG === 'YOUR_AIRGRADIENT_TOKEN') return el.innerHTML = "<p class='error-text'>Token requerido.</p>";
+      if(KEYS.AG === 'YOUR_AIRGRADIENT_TOKEN') return el.innerHTML = "<p class='error-text'>Token de AirGradient requerido.</p>";
       options.headers['Authorization'] = `Bearer ${KEYS.AG}`;
   }
 
