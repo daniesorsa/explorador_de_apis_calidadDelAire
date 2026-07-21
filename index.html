@@ -6,12 +6,12 @@
   <title>Explorador Avanzado de APIs - Calidad del Aire (Live Data)</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body data-theme="dark">
 
 <div class="container">
   <div class="header">
     <h2>Explorador de APIs - Monitoreo Ambiental (Datos Tabulares)</h2>
-    <button class="theme-toggle" id="btn-theme-toggle">🌓 Cambiar Tema</button>
+    <button class="theme-toggle" id="btn-theme-toggle">☀️ Cambiar Tema</button>
   </div>
 
   <div class="tabs">
@@ -25,10 +25,6 @@
   <div id="panel-purpleair" class="grid-layout panel-api">
     <div class="left-col">
       <div class="card">
-        <div class="info-header">
-          <a href="https://api.purpleair.com/" target="_blank" class="doc-link">Ver Documentación de la API ↗</a>
-        </div>
-        
         <div class="row">
           <div class="field">
             <label>Endpoint</label>
@@ -39,7 +35,6 @@
             </select>
           </div>
         </div>
-        
         <div class="row" id="pa-sensor-row">
           <div class="field">
             <label>Seleccionar Sensor</label>
@@ -52,7 +47,6 @@
             </select>
           </div>
         </div>
-        
         <div class="row hidden" id="pa-region-row">
           <div class="field">
             <label>Área Geográfica</label>
@@ -62,16 +56,9 @@
             </select>
           </div>
         </div>
-        
         <div class="row hidden" id="pa-history-row">
-          <div class="field">
-            <label>Inicio (UNIX)</label>
-            <input type="number" id="pa-start" value="1704067200">
-          </div>
-          <div class="field">
-            <label>Fin (UNIX)</label>
-            <input type="number" id="pa-end" value="1704153600">
-          </div>
+          <div class="field"><label>Inicio (UNIX)</label><input type="number" id="pa-start" value="1704067200"></div>
+          <div class="field"><label>Fin (UNIX)</label><input type="number" id="pa-end" value="1704153600"></div>
           <div class="field">
             <label>Promedio</label>
             <select id="pa-avg">
@@ -83,8 +70,8 @@
         </div>
       </div>
       
-      <!-- NUEVO BLOQUE PURPLEAIR: Fecha, Hora y Copiado Directo -->
-      <div class="card" id="pa-info-block" style="background: rgba(16, 185, 129, 0.05); border-color: var(--primary);">
+      <!-- BLOQUE DE INFORMACIÓN Y COPIADO -->
+      <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: var(--primary);">
         <div class="row" style="margin-bottom: 0;">
           <div class="field">
             <label>Fecha de Consulta</label>
@@ -102,17 +89,16 @@
     <div class="right-col">
       <div class="code-block">
         <div class="btn-group">
-          <!-- Botón simular movido al bloque principal de endpoint final -->
           <button class="btn primary btn-simulate" data-api="purpleair">Ejecutar Petición Real ▶</button>
         </div>
-        <div class="code-title">Endpoint Final a Consultar (Copiable)</div>
+        <div class="code-title">Endpoint Final a Consultar</div>
         <div class="url-display" id="pa-url"></div>
       </div>
       <div class="code-block" style="margin-top: 1rem;">
         <div class="btn-group">
             <button class="btn primary hidden btn-download" id="btn-dl-purpleair" data-api="purpleair">Descargar JSON ⬇</button>
         </div>
-        <div class="code-title">Tabla de Mediciones Extraídas (Con Metadata Espacial)</div>
+        <div class="code-title">Tabla de Mediciones Extraídas</div>
         <div class="data-table-container" id="pa-table">// Presiona "Ejecutar Petición Real" para construir la matriz de datos.</div>
       </div>
     </div>
@@ -122,9 +108,6 @@
   <div id="panel-iqair" class="grid-layout panel-api hidden">
     <div class="left-col">
       <div class="card">
-        <div class="info-header">
-          <a href="https://www.iqair.com/dashboards/api" target="_blank" class="doc-link">Ver Documentación de la API ↗</a>
-        </div>
         <div class="row">
           <div class="field">
             <label>Seleccionar Ciudad (Coordenadas Automáticas)</label>
@@ -135,12 +118,26 @@
           </div>
         </div>
       </div>
-      <div id="iq-params"></div>
+      
+      <!-- BLOQUE DE INFORMACIÓN Y COPIADO -->
+      <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: var(--primary);">
+        <div class="row" style="margin-bottom: 0;">
+          <div class="field">
+            <label>Fecha de Consulta</label>
+            <div id="iq-date-display" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main); font-weight: bold;"></div>
+          </div>
+          <div class="field">
+            <label>Hora de Consulta</label>
+            <div id="iq-time-display" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main); font-weight: bold;"></div>
+          </div>
+        </div>
+        <button class="btn primary btn-copy" data-target="iq-url" style="width: 100%; margin-top: 1.5rem; font-size: 0.9rem; padding: 0.8rem;">Copiar URL de Consulta (Incluye API Key)</button>
+      </div>
     </div>
+    
     <div class="right-col">
       <div class="code-block">
         <div class="btn-group">
-          <button class="btn btn-copy" data-target="iq-url">Copiar URL</button>
           <button class="btn primary btn-simulate" data-api="iqair">Ejecutar Petición Real ▶</button>
         </div>
         <div class="code-title">Endpoint Final a Consultar</div>
@@ -160,9 +157,6 @@
   <div id="panel-openaq" class="grid-layout panel-api hidden">
     <div class="left-col">
       <div class="card">
-        <div class="info-header">
-          <a href="https://docs.openaq.org/" target="_blank" class="doc-link">Ver Documentación de la API ↗</a>
-        </div>
         <div class="row">
           <div class="field">
             <label>Estación de Monitoreo / Ciudad</label>
@@ -173,15 +167,29 @@
           </div>
         </div>
       </div>
-      <div id="oaq-params"></div>
+
+      <!-- BLOQUE DE INFORMACIÓN Y COPIADO -->
+      <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: var(--primary);">
+        <div class="row" style="margin-bottom: 0;">
+          <div class="field">
+            <label>Fecha de Consulta</label>
+            <div id="oaq-date-display" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main); font-weight: bold;"></div>
+          </div>
+          <div class="field">
+            <label>Hora de Consulta</label>
+            <div id="oaq-time-display" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main); font-weight: bold;"></div>
+          </div>
+        </div>
+        <button class="btn primary btn-copy" data-target="oaq-url" style="width: 100%; margin-top: 1.5rem; font-size: 0.9rem; padding: 0.8rem;">Copiar URL de Consulta (Endpoint Público Abierto)</button>
+      </div>
     </div>
+    
     <div class="right-col">
       <div class="code-block">
         <div class="btn-group">
-          <button class="btn btn-copy" data-target="oaq-url">Copiar URL</button>
           <button class="btn primary btn-simulate" data-api="openaq">Ejecutar Petición Real ▶</button>
         </div>
-        <div class="code-title">Endpoint Final a Consultar</div>
+        <div class="code-title">Endpoint Final a Consultar (V2 Sin Restricciones)</div>
         <div class="url-display" id="oaq-url"></div>
       </div>
       <div class="code-block" style="margin-top: 1rem;">
@@ -198,9 +206,6 @@
   <div id="panel-airgradient" class="grid-layout panel-api hidden">
     <div class="left-col">
       <div class="card">
-        <div class="info-header">
-          <a href="https://app.airgradient.com/api" target="_blank" class="doc-link">Ver Documentación de la API ↗</a>
-        </div>
         <div class="row">
           <div class="field">
             <label>Endpoint</label>
@@ -227,12 +232,26 @@
           <div class="field"><label>Hasta</label><input type="date" id="ag-to" value="2026-07-21"></div>
         </div>
       </div>
-      <div id="ag-params"></div>
+
+      <!-- BLOQUE DE INFORMACIÓN Y COPIADO -->
+      <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: var(--primary);">
+        <div class="row" style="margin-bottom: 0;">
+          <div class="field">
+            <label>Fecha de Consulta</label>
+            <div id="ag-date-display" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main); font-weight: bold;"></div>
+          </div>
+          <div class="field">
+            <label>Hora de Consulta</label>
+            <div id="ag-time-display" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main); font-weight: bold;"></div>
+          </div>
+        </div>
+        <button class="btn primary btn-copy" data-target="ag-url" style="width: 100%; margin-top: 1.5rem; font-size: 0.9rem; padding: 0.8rem;">Copiar URL de Consulta (Token Requerido)</button>
+      </div>
     </div>
+    
     <div class="right-col">
       <div class="code-block">
         <div class="btn-group">
-          <button class="btn btn-copy" data-target="ag-url">Copiar URL</button>
           <button class="btn primary btn-simulate" data-api="airgradient">Ejecutar Petición Real ▶</button>
         </div>
         <div class="code-title">Endpoint Final a Consultar</div>
