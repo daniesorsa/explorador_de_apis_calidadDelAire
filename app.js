@@ -98,7 +98,7 @@ function buildPA() {
   // SOLUCIÓN HISTÓRICOS Y BOUNDING BOX:
   // Se excluye "time_stamp", "name", "latitude", "longitude" de la data histórica, ya que la API de PurpleAir lo rechaza o lo incluye por defecto.
   const FIELDS_CURRENT = 'name,latitude,longitude,pm1.0,pm2.5_atm,pm2.5_cf_1,pm10.0_atm,temperature,humidity,pressure,voc,ozone1';
-  const FIELDS_HISTORY = 'pm1.0,pm2.5_atm,pm2.5_cf_1,pm10.0_atm,temperature,humidity,pressure,voc,ozone1';
+  const FIELDS_HISTORY = 'pm1.0_atm,pm2.5_atm,pm2.5_cf_1,pm10.0_atm,temperature,humidity,pressure,voc';
   const FIELDS_LIST = 'sensor_index,name,latitude,longitude,pm1.0,pm2.5_atm,pm10.0_atm,temperature,humidity';
 
   if (mode === 'current') {
@@ -296,7 +296,13 @@ async function executeRealRequest(api) {
 
   try {
     const response = await fetch(url, options);
-    const data = await response.json();
+    const text = await response.text();
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch(e) {
+        throw new Error(`El servidor respondió con contenido inválido (no JSON). Status: ${response.status}. Fragmento: ${text.substring(0, 100)}...`);
+    }
 
     if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
