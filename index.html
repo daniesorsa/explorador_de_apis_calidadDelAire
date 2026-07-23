@@ -102,6 +102,7 @@
       </div>
       <div class="code-block" style="margin-top: 1rem;">
         <div class="btn-group">
+            <button class="btn primary hidden" id="btn-dl-pa-avg">Descargar Promedios ⬇</button>
             <button class="btn primary hidden btn-download" id="btn-dl-purpleair" data-api="purpleair">Descargar JSON ⬇</button>
         </div>
         <div class="code-title">Tabla de Mediciones Extraídas</div>
@@ -118,8 +119,23 @@
           <div class="field">
             <label>Seleccionar Ciudad (Coordenadas Automáticas)</label>
             <select id="iq-city-dropdown">
-              <option value="tegucigalpa">Tegucigalpa</option>
-              <option value="sps">San Pedro Sula</option>
+              <option value="Tegucigalpa|Francisco Morazan">Tegucigalpa</option>
+              <option value="San Pedro Sula|Cortes">San Pedro Sula</option>
+              <option value="La Ceiba|Atlantida">La Ceiba</option>
+              <option value="Sambo Creek|Atlantida">Sambo Creek</option>
+              <option value="Tela|Atlantida">Tela</option>
+              <option value="Ciudad Choluteca|Choluteca">Ciudad Choluteca</option>
+              <option value="Marcovia|Choluteca">Marcovia</option>
+              <option value="Saba|Colon">Saba</option>
+              <option value="Yamaranguila|Intibuca">Yamaranguila</option>
+              <option value="La Paz|La Paz">La Paz</option>
+              <option value="Marcala|La Paz">Marcala</option>
+              <option value="Gracias|Lempira">Gracias</option>
+              <option value="Lepaera|Lempira">Lepaera</option>
+              <option value="Dulce Nombre de Culmi|Olancho">Dulce Nombre de Culmi</option>
+              <option value="Gualaco|Olancho">Gualaco</option>
+              <option value="San Esteban|Olancho">San Esteban</option>
+              <option value="Santa Maria del Real|Olancho">Santa Maria del Real</option>
             </select>
           </div>
         </div>
@@ -166,8 +182,11 @@
           <div class="field">
             <label>Estación de Monitoreo / Ciudad</label>
             <select id="oaq-loc-dropdown">
-              <option value="8118">Tegucigalpa (US Diplomatic Post)</option>
-              <option value="8119">San Pedro Sula (ID Referencial)</option>
+              <option value="6321902">Lepaterique (Sustenta Honduras)</option>
+              <option value="6313768">Ocotepeque (Sustenta Honduras)</option>
+              <option value="6321016">IBANS, Rayaka (Sustenta Honduras)</option>
+              <option value="6327637">UMA - Olanchito</option>
+              <option value="6378473">La Entrada, Copan</option>
             </select>
           </div>
         </div>

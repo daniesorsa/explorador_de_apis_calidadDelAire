@@ -8,10 +8,7 @@ const KEYS = {
   OAQ: '15440168e9f1863ef9b080ce4b171c56e5364beb8ccf3ae2971763658a909f25'
 };
 
-const IQAIR_CITIES_DB = {
-  "tegucigalpa": { lat: "14.0818", lon: "-87.2068" },
-  "sps": { lat: "15.5042", lon: "-88.0250" }
-};
+// IQAIR_CITIES_DB eliminado (se buscará directamente por nombre y estado en la API)
 
 window.apiDataCache = { purpleair: null, iqair: null, openaq: null };
 
@@ -38,6 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('input', updateUI);
     el.addEventListener('change', updateUI);
   });
+
+  const btnAvg = document.getElementById('btn-dl-pa-avg');
+  if(btnAvg) btnAvg.addEventListener('click', downloadPAAverages);
 
   setInterval(updateClocks, 1000);
   updateUI();
@@ -96,9 +96,9 @@ function buildPA() {
   let url = '';
   
   // SOLUCIÓN HISTÓRICOS Y BOUNDING BOX:
-  // Se excluye "name", "latitude", "longitude" de la data histórica, ya que la API de PurpleAir lo rechaza.
+  // Se excluye "time_stamp", "name", "latitude", "longitude" de la data histórica, ya que la API de PurpleAir lo rechaza o lo incluye por defecto.
   const FIELDS_CURRENT = 'name,latitude,longitude,pm1.0,pm2.5_atm,pm2.5_cf_1,pm10.0_atm,temperature,humidity,pressure,voc,ozone1';
-  const FIELDS_HISTORY = 'time_stamp,pm1.0,pm2.5_atm,pm2.5_cf_1,pm10.0_atm,temperature,humidity,pressure,voc,ozone1';
+  const FIELDS_HISTORY = 'pm1.0,pm2.5_atm,pm2.5_cf_1,pm10.0_atm,temperature,humidity,pressure,voc,ozone1';
   const FIELDS_LIST = 'sensor_index,name,latitude,longitude,pm1.0,pm2.5_atm,pm10.0_atm,temperature,humidity';
 
   if (mode === 'current') {
@@ -117,16 +117,16 @@ function buildPA() {
 }
 
 function buildIQ() {
-  const cityKey = document.getElementById('iq-city-dropdown').value;
-  const coords = IQAIR_CITIES_DB[cityKey];
-  const url = `https://api.airvisual.com/v2/nearest_city?lat=${coords.lat}&lon=${coords.lon}&key=${KEYS.IQ}`;
+  const value = document.getElementById('iq-city-dropdown').value;
+  const [city, state] = value.split('|');
+  const url = `https://api.airvisual.com/v2/city?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&country=Honduras&key=${KEYS.IQ}`;
   document.getElementById('iq-url').textContent = url;
 }
 
 function buildOAQ() {
   const id = document.getElementById('oaq-loc-dropdown').value;
-  // SOLUCIÓN OPENAQ: Uso explícito de la v2 para evitar el bloqueo del navegador al no usar un servidor Backend.
-  const url = `https://api.openaq.org/v2/locations/${id}`;
+  // SOLUCIÓN OPENAQ: Uso explícito de la v3 con API Key en los headers para evitar NetworkError/410 Gone.
+  const url = `https://api.openaq.org/v3/locations/${id}`;
   document.getElementById('oaq-url').textContent = url;
 }
 
@@ -139,6 +139,10 @@ function updateUI() {
   buildPA();
   buildIQ(); 
   buildOAQ();
+  
+  // Mostrar u ocultar el botón de promedios según el modo de PA
+  const btnAvg = document.getElementById('btn-dl-pa-avg');
+  if (btnAvg) btnAvg.classList.toggle('hidden', paMode !== 'list');
 }
 
 function buildDataTable(api, data) {
@@ -178,10 +182,12 @@ function buildDataTable(api, data) {
         else if (api === 'iqair') {
             const w = data.data.current.weather;
             const p = data.data.current.pollution;
-            const selectedCity = IQAIR_CITIES_DB[document.getElementById('iq-city-dropdown').value];
+            const loc = data.data.location;
             
-            rows.push(`<tr><td>Latitud Espacial</td><td>${selectedCity.lat}</td></tr>`);
-            rows.push(`<tr><td>Longitud Espacial</td><td>${selectedCity.lon}</td></tr>`);
+            if (loc && loc.coordinates) {
+                rows.push(`<tr><td>Longitud Espacial</td><td>${loc.coordinates[0]}</td></tr>`);
+                rows.push(`<tr><td>Latitud Espacial</td><td>${loc.coordinates[1]}</td></tr>`);
+            }
             rows.push(`<tr><td>Temperatura Ambiente (°C)</td><td>${w.tp}</td></tr>`);
             rows.push(`<tr><td>Humedad Relativa (%)</td><td>${w.hu}</td></tr>`);
             rows.push(`<tr><td>Presión Atmosférica (hPa)</td><td>${w.pr}</td></tr>`);
@@ -190,22 +196,23 @@ function buildDataTable(api, data) {
             rows.push(`<tr><td>Contaminante Principal</td><td>${p.mainus}</td></tr>`);
         } 
         else if (api === 'openaq') {
-            // Adaptación de extracción segura para la estructura de OpenAQ v2.
+            // Adaptación de extracción segura para la estructura de OpenAQ v3.
             if (!data.results || data.results.length === 0) throw new Error("No se encontró la locación (ID inválido o sin datos recientes).");
             
             const locData = data.results[0];
             rows.push(`<tr><td>ID de Estación</td><td>${locData.id}</td></tr>`);
             rows.push(`<tr><td>Nombre de Estación</td><td>${locData.name}</td></tr>`);
-            rows.push(`<tr><td>Ciudad / País</td><td>${locData.city || 'N/A'} / ${locData.country || 'N/A'}</td></tr>`);
+            rows.push(`<tr><td>Ciudad / País</td><td>${locData.locality || 'N/A'} / ${locData.country ? locData.country.name : 'N/A'}</td></tr>`);
             
             if(locData.coordinates) {
                 rows.push(`<tr><td>Latitud Espacial</td><td>${locData.coordinates.latitude}</td></tr>`);
                 rows.push(`<tr><td>Longitud Espacial</td><td>${locData.coordinates.longitude}</td></tr>`);
             }
             
-            if (locData.parameters && Array.isArray(locData.parameters)) {
-                locData.parameters.forEach(p => {
-                    rows.push(`<tr><td>${p.displayName || p.parameter.toUpperCase()}</td><td>${p.lastValue} ${p.unit || ''}</td></tr>`);
+            if (locData.sensors && Array.isArray(locData.sensors)) {
+                locData.sensors.forEach(s => {
+                    const paramName = s.parameter ? (s.parameter.displayName || s.parameter.name) : s.name;
+                    rows.push(`<tr><td>${paramName.toUpperCase()}</td><td>Disponible (Consultar serie temporal)</td></tr>`);
                 });
             }
         }
@@ -228,6 +235,46 @@ function downloadJSON(api) {
     document.body.removeChild(a);
 }
 
+function downloadPAAverages() {
+    const data = window.apiDataCache['purpleair'];
+    if (!data || !data.data || !Array.isArray(data.data)) {
+        showToast("No hay datos de área cargados para promediar.", true);
+        return;
+    }
+
+    let sums = { pm1_0: 0, pm2_5: 0, pm10_0: 0, temperature: 0, humidity: 0 };
+    let counts = { pm1_0: 0, pm2_5: 0, pm10_0: 0, temperature: 0, humidity: 0 };
+
+    data.data.forEach(sensorArray => {
+        let s = {};
+        data.fields.forEach((f, i) => s[f] = sensorArray[i]);
+        
+        if (s['pm1.0'] != null) { sums.pm1_0 += s['pm1.0']; counts.pm1_0++; }
+        if (s['pm2.5_atm'] != null) { sums.pm2_5 += s['pm2.5_atm']; counts.pm2_5++; }
+        if (s['pm10.0_atm'] != null) { sums.pm10_0 += s['pm10.0_atm']; counts.pm10_0++; }
+        if (s['temperature'] != null) { sums.temperature += s['temperature']; counts.temperature++; }
+        if (s['humidity'] != null) { sums.humidity += s['humidity']; counts.humidity++; }
+    });
+
+    const avg = {
+        sensor_count: data.data.length,
+        average_pm1_0: counts.pm1_0 ? parseFloat((sums.pm1_0 / counts.pm1_0).toFixed(2)) : null,
+        average_pm2_5: counts.pm2_5 ? parseFloat((sums.pm2_5 / counts.pm2_5).toFixed(2)) : null,
+        average_pm10_0: counts.pm10_0 ? parseFloat((sums.pm10_0 / counts.pm10_0).toFixed(2)) : null,
+        average_temperature: counts.temperature ? parseFloat((sums.temperature / counts.temperature).toFixed(2)) : null,
+        average_humidity: counts.humidity ? parseFloat((sums.humidity / counts.humidity).toFixed(2)) : null
+    };
+
+    const now = new Date();
+    const filename = `purpleair_averages_${now.toISOString().split('T')[0]}.json`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(avg, null, 2)], { type: 'application/json' }));
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
 // ==========================================
 // EJECUCIÓN HTTP (FETCH REAL)
 // ==========================================
@@ -241,8 +288,11 @@ async function executeRealRequest(api) {
   el.innerHTML = "<p>Conectando al servidor...</p>";
   btnDownload.classList.add('hidden'); 
 
-  // Petición plana y directa: Ninguna API aquí usa headers restrictivos ahora.
-  let options = { method: 'GET' };
+  let options = { method: 'GET', headers: {} };
+  
+  if (api === 'openaq') {
+      options.headers['X-API-Key'] = KEYS.OAQ;
+  }
 
   try {
     const response = await fetch(url, options);
