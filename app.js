@@ -1,8 +1,11 @@
+/**
+ * Lógica de conexión en TIEMPO REAL del Explorador de APIs.
+ */
+
 const KEYS = { 
-  PA: 'AECECD5B-8518-11F1-9E30-4201AC1DC129', 
-  IQ: '65948212-5b5d-4aa1-b507-5c547bced938', 
-  OAQ: '15440168e9f1863ef9b080ce4b171c56e5364beb8ccf3ae2971763658a909f25', 
-  AG: 'YOUR_AIRGRADIENT_TOKEN' 
+  PA: '865A0734-3A82-11F1-B596-4201AC1DC123', 
+  IQ: 'd2f965eb-24ec-4296-bd26-6ab153f47b63', 
+  OAQ: '15440168e9f1863ef9b080ce4b171c56e5364beb8ccf3ae2971763658a909f25'
 };
 
 const IQAIR_CITIES_DB = {
@@ -10,9 +13,7 @@ const IQAIR_CITIES_DB = {
   "sps": { lat: "15.5042", lon: "-88.0250" }
 };
 
-window.apiDataCache = {
-    purpleair: null, iqair: null, openaq: null, airgradient: null
-};
+window.apiDataCache = { purpleair: null, iqair: null, openaq: null };
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-theme-toggle').addEventListener('click', toggleTheme);
@@ -42,9 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
   updateUI();
 });
 
-// ==========================================
-// UTILIDADES Y RELOJES SINCRONIZADOS
-// ==========================================
 function toggleTheme() {
   const body = document.body;
   const isDark = body.getAttribute('data-theme') === 'dark';
@@ -72,12 +70,19 @@ function copyText(id) {
   showToast('¡URL de Consulta copiada exitosamente!');
 }
 
+function getTodayStr() {
+    return new Date().toISOString().split('T')[0];
+}
+
+function getTimeStr() {
+    return new Date().toTimeString().split(' ')[0];
+}
+
 function updateClocks() {
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('es-HN');
-  const timeStr = now.toLocaleTimeString('es-HN');
+  const dateStr = getTodayStr();
+  const timeStr = getTimeStr();
   
-  ['pa', 'iq', 'oaq', 'ag'].forEach(prefix => {
+  ['pa', 'iq', 'oaq'].forEach(prefix => {
       const dateEl = document.getElementById(`${prefix}-date-display`);
       const timeEl = document.getElementById(`${prefix}-time-display`);
       if(dateEl) dateEl.textContent = dateStr;
@@ -85,25 +90,26 @@ function updateClocks() {
   });
 }
 
-// ==========================================
-// CONSTRUCTORES DE URL
-// ==========================================
-
 function buildPA() {
   const mode = document.getElementById('pa-mode').value;
   const sensor = document.getElementById('pa-sensor').value;
   let url = '';
-  const ALL_FIELDS = 'name,latitude,longitude,pm1.0,pm2.5_atm,pm2.5_cf_1,pm10.0_atm,temperature,humidity,pressure,voc,ozone1';
+  
+  // SOLUCIÓN HISTÓRICOS Y BOUNDING BOX:
+  // Se excluye "name", "latitude", "longitude" de la data histórica, ya que la API de PurpleAir lo rechaza.
+  const FIELDS_CURRENT = 'name,latitude,longitude,pm1.0,pm2.5_atm,pm2.5_cf_1,pm10.0_atm,temperature,humidity,pressure,voc,ozone1';
+  const FIELDS_HISTORY = 'time_stamp,pm1.0,pm2.5_atm,pm2.5_cf_1,pm10.0_atm,temperature,humidity,pressure,voc,ozone1';
+  const FIELDS_LIST = 'sensor_index,name,latitude,longitude,pm1.0,pm2.5_atm,pm10.0_atm,temperature,humidity';
 
   if (mode === 'current') {
-    url = `https://api.purpleair.com/v1/sensors/${sensor}?fields=${ALL_FIELDS}`;
+    url = `https://api.purpleair.com/v1/sensors/${sensor}?fields=${FIELDS_CURRENT}`;
   } else if (mode === 'history') {
     const s = document.getElementById('pa-start').value, e = document.getElementById('pa-end').value, a = document.getElementById('pa-avg').value;
-    url = `https://api.purpleair.com/v1/sensors/${sensor}/history?fields=${ALL_FIELDS}&start_timestamp=${s}&end_timestamp=${e}&average=${a}`;
+    url = `https://api.purpleair.com/v1/sensors/${sensor}/history?fields=${FIELDS_HISTORY}&start_timestamp=${s}&end_timestamp=${e}&average=${a}`;
   } else {
     const r = document.getElementById('pa-region').value;
     const [nwlat, nwlng, selat, selng] = r === 'tgu' ? ['14.20','-87.35','13.95','-87.10'] : ['15.60','-88.10','15.40','-87.90'];
-    url = `https://api.purpleair.com/v1/sensors?fields=sensor_index,${ALL_FIELDS}&nwlat=${nwlat}&nwlng=${nwlng}&selat=${selat}&selng=${selng}`;
+    url = `https://api.purpleair.com/v1/sensors?fields=${FIELDS_LIST}&nwlat=${nwlat}&nwlng=${nwlng}&selat=${selat}&selng=${selng}`;
   }
   
   url += `&api_key=${KEYS.PA}`;
@@ -119,23 +125,9 @@ function buildIQ() {
 
 function buildOAQ() {
   const id = document.getElementById('oaq-loc-dropdown').value;
-  // Regresamos a la v3 oficial de OpenAQ
-  const url = `https://api.openaq.org/v3/locations/${id}`;
+  // SOLUCIÓN OPENAQ: Uso explícito de la v2 para evitar el bloqueo del navegador al no usar un servidor Backend.
+  const url = `https://api.openaq.org/v2/locations/${id}`;
   document.getElementById('oaq-url').textContent = url;
-}
-
-function buildAG() {
-  const mode = document.getElementById('ag-mode').value;
-  const id = document.getElementById('ag-locid').value;
-  let url = '';
-
-  if (mode === 'places') url = `https://api.airgradient.com/public/api/v1/places`;
-  else if (mode === 'current') url = `https://api.airgradient.com/public/api/v1/locations/${id}/measures/current`;
-  else {
-    const b = document.getElementById('ag-bucket').value, f = document.getElementById('ag-from').value, t = document.getElementById('ag-to').value;
-    url = `https://api.airgradient.com/public/api/v1/locations/${id}/measures?type=${b}&from=${f}&to=${t}`;
-  }
-  document.getElementById('ag-url').textContent = url;
 }
 
 function updateUI() {
@@ -147,30 +139,41 @@ function updateUI() {
   buildPA();
   buildIQ(); 
   buildOAQ();
-
-  const agMode = document.getElementById('ag-mode').value;
-  document.getElementById('ag-loc-row').classList.toggle('hidden', agMode === 'places');
-  document.getElementById('ag-hist-row').classList.toggle('hidden', agMode !== 'history');
-  buildAG();
 }
 
-// ==========================================
-// PARSER DE DATOS: APLANAMIENTO A TABLA
-// ==========================================
 function buildDataTable(api, data) {
     let rows = [];
     try {
         if (api === 'purpleair') {
-            const s = data.sensor || data.data; 
-            if(!s) throw new Error("Estructura 'sensor' no encontrada.");
-            
-            const dict = {
-                "sensor_index": "ID de Estación", "latitude": "Latitud Espacial", "longitude": "Longitud Espacial", "name": "Identificador de Estación",
-                "pm1.0": "Masa PM 1.0 (µg/m³)", "pm2.5_atm": "Masa PM 2.5 Ambiental (µg/m³)", "pm10.0_atm": "Masa PM 10.0 Ambiental (µg/m³)",
-                "temperature": "Temperatura Local (°F)", "humidity": "Humedad Relativa (%)", "pressure": "Presión Atmosférica (mb)",
-                "voc": "Compuestos Orgánicos Volátiles (VOC)", "ozone1": "Ozono Estimado (O3)"
-            };
-            for (let key in dict) if (s[key] !== undefined) rows.push(`<tr><td>${dict[key]}</td><td>${s[key]}</td></tr>`);
+            if (data.fields && data.data && Array.isArray(data.data)) {
+                // SOLUCIÓN BOUNDING BOX / LISTA: Convierte la matriz de respuesta a objetos legibles.
+                if(data.data.length === 0) return `<p>Petición exitosa, pero no hay sensores reportando en esta área.</p>`;
+                rows.push(`<tr><th colspan="2" style="background:#334155; color:white; text-align:center;">SENSORES ENCONTRADOS: ${data.data.length}</th></tr>`);
+                
+                data.data.forEach(sensorArray => {
+                    let s = {};
+                    data.fields.forEach((f, i) => s[f] = sensorArray[i]);
+                    rows.push(`<tr><td colspan="2" style="background:rgba(16,185,129,0.2); font-weight:bold; color:#a7f3d0;">Sensor ID: ${s.sensor_index} - ${s.name || 'Sin Nombre'}</td></tr>`);
+                    const dict = {
+                        "latitude": "Latitud", "longitude": "Longitud",
+                        "pm1.0": "PM 1.0 (µg/m³)", "pm2.5_atm": "PM 2.5 (µg/m³)", "pm10.0_atm": "PM 10.0 (µg/m³)",
+                        "temperature": "Temperatura (°F)", "humidity": "Humedad (%)"
+                    };
+                    for (let key in dict) if (s[key] !== undefined && s[key] !== null) rows.push(`<tr><td>${dict[key]}</td><td>${s[key]}</td></tr>`);
+                });
+            } else if (data.sensor) {
+                // MODO TIEMPO REAL (Sensor Específico)
+                const s = data.sensor;
+                const dict = {
+                    "sensor_index": "ID de Estación", "latitude": "Latitud Espacial", "longitude": "Longitud Espacial", "name": "Identificador de Estación",
+                    "pm1.0": "Masa PM 1.0 (µg/m³)", "pm2.5_atm": "Masa PM 2.5 Ambiental (µg/m³)", "pm10.0_atm": "Masa PM 10.0 Ambiental (µg/m³)",
+                    "temperature": "Temperatura Local (°F)", "humidity": "Humedad Relativa (%)", "pressure": "Presión Atmosférica (mb)",
+                    "voc": "Compuestos Orgánicos Volátiles (VOC)", "ozone1": "Ozono Estimado (O3)"
+                };
+                for (let key in dict) if (s[key] !== undefined) rows.push(`<tr><td>${dict[key]}</td><td>${s[key]}</td></tr>`);
+            } else {
+                throw new Error("Estructura 'sensor' o 'data' no encontrada o el periodo histórico está vacío.");
+            }
         } 
         else if (api === 'iqair') {
             const w = data.data.current.weather;
@@ -187,43 +190,28 @@ function buildDataTable(api, data) {
             rows.push(`<tr><td>Contaminante Principal</td><td>${p.mainus}</td></tr>`);
         } 
         else if (api === 'openaq') {
-            // Estructura actualizada a la v3
+            // Adaptación de extracción segura para la estructura de OpenAQ v2.
+            if (!data.results || data.results.length === 0) throw new Error("No se encontró la locación (ID inválido o sin datos recientes).");
+            
             const locData = data.results[0];
             rows.push(`<tr><td>ID de Estación</td><td>${locData.id}</td></tr>`);
             rows.push(`<tr><td>Nombre de Estación</td><td>${locData.name}</td></tr>`);
+            rows.push(`<tr><td>Ciudad / País</td><td>${locData.city || 'N/A'} / ${locData.country || 'N/A'}</td></tr>`);
             
-            // Las coordenadas en v3 vienen dentro del objeto geometry o boundingBox
             if(locData.coordinates) {
                 rows.push(`<tr><td>Latitud Espacial</td><td>${locData.coordinates.latitude}</td></tr>`);
                 rows.push(`<tr><td>Longitud Espacial</td><td>${locData.coordinates.longitude}</td></tr>`);
-            } else if (locData.bounds) {
-                rows.push(`<tr><td>Límites Geográficos</td><td>${locData.bounds.join(', ')}</td></tr>`);
             }
             
-            // En v3 los parámetros vienen en un array diferente
             if (locData.parameters && Array.isArray(locData.parameters)) {
                 locData.parameters.forEach(p => {
                     rows.push(`<tr><td>${p.displayName || p.parameter.toUpperCase()}</td><td>${p.lastValue} ${p.unit || ''}</td></tr>`);
                 });
-            } else if (locData.sensors && Array.isArray(locData.sensors)) {
-                 locData.sensors.forEach(s => {
-                    const latest = s.latest || {};
-                    rows.push(`<tr><td>${s.parameter.displayName || s.parameter.name.toUpperCase()}</td><td>${latest.value || 'N/A'} ${s.parameter.units || ''}</td></tr>`);
-                });
             }
-        } 
-        else if (api === 'airgradient') {
-            const d = Array.isArray(data) ? data[data.length - 1] : data; 
-            const dict = {
-                "locationId": "ID de Estación", "pm01": "Masa PM 1.0 (µg/m³)", "pm02": "Masa PM 2.5 (µg/m³)", "pm10": "Masa PM 10.0 (µg/m³)",
-                "atmp": "Temperatura Interna (°C)", "rhum": "Humedad Relativa (%)", "rco2": "Dióxido de Carbono (ppm)",
-                "tvoc": "Compuestos Orgánicos Volátiles Totales"
-            };
-            for (let key in dict) if (d[key] !== undefined) rows.push(`<tr><td>${dict[key]}</td><td>${d[key]}</td></tr>`);
         }
     } catch(e) { return `<p class="error-text">Error transformando JSON: ${e.message}</p>`; }
 
-    if (rows.length === 0) return `<p>Petición exitosa, pero no se encontraron datos de sensores.</p>`;
+    if (rows.length === 0) return `<p>Petición exitosa, pero no se encontraron datos válidos.</p>`;
     return `<table class="data-table"><thead><tr><th>Variable</th><th>Valor Reportado</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
 }
 
@@ -241,44 +229,28 @@ function downloadJSON(api) {
 }
 
 // ==========================================
-// EJECUCIÓN HTTP (CON PROXY CORS INTEGRADO)
+// EJECUCIÓN HTTP (FETCH REAL)
 // ==========================================
 async function executeRealRequest(api) {
-  const prefix = api === 'purpleair' ? 'pa' : api === 'iqair' ? 'iq' : api === 'openaq' ? 'oaq' : 'ag';
+  const prefix = api === 'purpleair' ? 'pa' : api === 'iqair' ? 'iq' : api === 'openaq' ? 'oaq' : '';
   const el = document.getElementById(`${prefix}-table`);
   const btnDownload = document.getElementById(`btn-dl-${api}`);
   let url = document.getElementById(`${prefix}-url`).textContent;
   
   el.classList.remove('error-text');
-  el.innerHTML = "<p>Iniciando Extracción de Datos...</p>";
+  el.innerHTML = "<p>Conectando al servidor...</p>";
   btnDownload.classList.add('hidden'); 
 
-  let options = { method: 'GET', headers: {} };
-  
-  if (api === 'purpleair') {
-      options.headers['X-API-Key'] = KEYS.PA; 
-  } 
-  else if (api === 'openaq') {
-      // 1. Restauramos la llave en las cabeceras porque OpenAQ la exige.
-      options.headers['X-API-Key'] = KEYS.OAQ;
-      
-      // 2. SOLUCIÓN CORS: Usamos un proxy público transparente para envolver la URL.
-      // Esto hace que el proxy se conecte a OpenAQ por ti y le pase los datos al navegador,
-      // evadiendo por completo el bloqueo de seguridad.
-      url = 'https://corsproxy.io/?' + encodeURIComponent(url);
-  } 
-  else if (api === 'airgradient') {
-      if(KEYS.AG === 'YOUR_AIRGRADIENT_TOKEN') return el.innerHTML = "<p class='error-text'>Token de AirGradient requerido.</p>";
-      options.headers['Authorization'] = `Bearer ${KEYS.AG}`;
-  }
-
-  if (Object.keys(options.headers).length === 0) delete options.headers;
+  // Petición plana y directa: Ninguna API aquí usa headers restrictivos ahora.
+  let options = { method: 'GET' };
 
   try {
     const response = await fetch(url, options);
     const data = await response.json();
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
+    }
     
     window.apiDataCache[api] = data;
     el.innerHTML = buildDataTable(api, data);

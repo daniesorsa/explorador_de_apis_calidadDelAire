@@ -18,7 +18,6 @@
     <button class="tab active" data-api="purpleair">PurpleAir</button>
     <button class="tab" data-api="iqair">IQAir</button>
     <button class="tab" data-api="openaq">OpenAQ</button>
-    <button class="tab" data-api="airgradient">AirGradient</button>
   </div>
 
   <!-- PANEL PURPLEAIR -->
@@ -37,13 +36,21 @@
         </div>
         <div class="row" id="pa-sensor-row">
           <div class="field">
-            <label>Seleccionar Sensor</label>
+            <label>Seleccionar Sensor (Red de Honduras)</label>
             <select id="pa-sensor">
-              <option value="36361">36361 — TGU Miraflores HSF 2</option>
-              <option value="36431">36431 — Santa Lucia HSF 3</option>
-              <option value="40035">40035 — TGU El Rincon HSF 1</option>
-              <option value="223233">223233 — Diamante HSF 8</option>
+              <option value="269846">269846 — UNICAH TGU HSF</option>
+              <option value="36361">36361 — TGU MIRAFLORES HONDURAS STEM FOUNDATION 2</option>
+              <option value="36431">36431 — Santa Lucia, HONDURAS STEM FOUNDATION 3</option>
+              <option value="298641">298641 — VALLE DE ANGELES HSF 12</option>
+              <option value="40035">40035 — TGU EL RINCON HONDURAS STEM FOUNDATION 1</option>
+              <option value="223233">223233 — Diamante Honduras STEM Foundation 8</option>
               <option value="223259">223259 — TGU TVC HSF 6</option>
+              <option value="228863">228863 — Siguatepeque Centro - Sustenta Honduras</option>
+              <option value="298623">298623 — UNICAH COPAN HSF</option>
+              <option value="269734">269734 — UNICAH CEIBA HSF</option>
+              <option value="281070">281070 — Zona trinchera</option>
+              <option value="167643">167643 — Laboratorio ECOQUIMSA - San Pedro Sula - Colonia Trejo</option>
+              <option value="223231">223231 — SPS TVC HSF 7</option>
             </select>
           </div>
         </div>
@@ -70,7 +77,6 @@
         </div>
       </div>
       
-      <!-- BLOQUE DE INFORMACIÓN Y COPIADO -->
       <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: var(--primary);">
         <div class="row" style="margin-bottom: 0;">
           <div class="field">
@@ -119,7 +125,6 @@
         </div>
       </div>
       
-      <!-- BLOQUE DE INFORMACIÓN Y COPIADO -->
       <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: var(--primary);">
         <div class="row" style="margin-bottom: 0;">
           <div class="field">
@@ -168,7 +173,6 @@
         </div>
       </div>
 
-      <!-- BLOQUE DE INFORMACIÓN Y COPIADO -->
       <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: var(--primary);">
         <div class="row" style="margin-bottom: 0;">
           <div class="field">
@@ -180,7 +184,7 @@
             <div id="oaq-time-display" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main); font-weight: bold;"></div>
           </div>
         </div>
-        <button class="btn primary btn-copy" data-target="oaq-url" style="width: 100%; margin-top: 1.5rem; font-size: 0.9rem; padding: 0.8rem;">Copiar URL de Consulta (Endpoint Público Abierto)</button>
+        <button class="btn primary btn-copy" data-target="oaq-url" style="width: 100%; margin-top: 1.5rem; font-size: 0.9rem; padding: 0.8rem;">Copiar URL de Consulta (Pública v2)</button>
       </div>
     </div>
     
@@ -189,7 +193,7 @@
         <div class="btn-group">
           <button class="btn primary btn-simulate" data-api="openaq">Ejecutar Petición Real ▶</button>
         </div>
-        <div class="code-title">Endpoint Final a Consultar (V2 Sin Restricciones)</div>
+        <div class="code-title">Endpoint Final a Consultar (V2)</div>
         <div class="url-display" id="oaq-url"></div>
       </div>
       <div class="code-block" style="margin-top: 1rem;">
@@ -202,70 +206,6 @@
     </div>
   </div>
 
-  <!-- PANEL AIRGRADIENT -->
-  <div id="panel-airgradient" class="grid-layout panel-api hidden">
-    <div class="left-col">
-      <div class="card">
-        <div class="row">
-          <div class="field">
-            <label>Endpoint</label>
-            <select id="ag-mode">
-              <option value="current">Medición Actual</option>
-              <option value="history">Datos Históricos (Series de Tiempo)</option>
-              <option value="places">Listado de Lugares del Usuario</option>
-            </select>
-          </div>
-        </div>
-        <div class="row" id="ag-loc-row">
-          <div class="field"><label>Location ID</label><input type="text" id="ag-locid" value="654321"></div>
-        </div>
-        <div class="row hidden" id="ag-hist-row">
-          <div class="field">
-            <label>Agrupación</label>
-            <select id="ag-bucket">
-              <option value="raw">Crudo (Cada 5 min)</option>
-              <option value="hours" selected>Agrupado por Hora</option>
-              <option value="days">Agrupado por Día</option>
-            </select>
-          </div>
-          <div class="field"><label>Desde</label><input type="date" id="ag-from" value="2026-07-15"></div>
-          <div class="field"><label>Hasta</label><input type="date" id="ag-to" value="2026-07-21"></div>
-        </div>
-      </div>
-
-      <!-- BLOQUE DE INFORMACIÓN Y COPIADO -->
-      <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: var(--primary);">
-        <div class="row" style="margin-bottom: 0;">
-          <div class="field">
-            <label>Fecha de Consulta</label>
-            <div id="ag-date-display" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main); font-weight: bold;"></div>
-          </div>
-          <div class="field">
-            <label>Hora de Consulta</label>
-            <div id="ag-time-display" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main); font-weight: bold;"></div>
-          </div>
-        </div>
-        <button class="btn primary btn-copy" data-target="ag-url" style="width: 100%; margin-top: 1.5rem; font-size: 0.9rem; padding: 0.8rem;">Copiar URL de Consulta (Token Requerido)</button>
-      </div>
-    </div>
-    
-    <div class="right-col">
-      <div class="code-block">
-        <div class="btn-group">
-          <button class="btn primary btn-simulate" data-api="airgradient">Ejecutar Petición Real ▶</button>
-        </div>
-        <div class="code-title">Endpoint Final a Consultar</div>
-        <div class="url-display" id="ag-url"></div>
-      </div>
-      <div class="code-block" style="margin-top: 1rem;">
-        <div class="btn-group">
-            <button class="btn primary hidden btn-download" id="btn-dl-airgradient" data-api="airgradient">Descargar JSON ⬇</button>
-        </div>
-        <div class="code-title">Tabla de Mediciones Extraídas</div>
-        <div class="data-table-container" id="ag-table">// Asegúrate de poner tu Token en el archivo JS antes de ejecutar esta petición.</div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <div id="toast" class="toast">URL copiada al portapapeles</div>
