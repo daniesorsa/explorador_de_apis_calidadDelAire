@@ -39,6 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnAvg = document.getElementById('btn-dl-pa-avg');
   if(btnAvg) btnAvg.addEventListener('click', downloadPAAverages);
 
+  // NUEVO: Vincular el botón de promedios históricos
+  const btnHistAvg = document.getElementById('btn-dl-pa-hist-avg');
+  if(btnHistAvg) btnHistAvg.addEventListener('click', downloadPAHistoryAverages);
+
   setInterval(updateClocks, 1000);
   updateUI();
 });
@@ -140,9 +144,11 @@ function updateUI() {
   buildIQ(); 
   buildOAQ();
   
-  // Mostrar u ocultar el botón de promedios según el modo de PA
+  // Ocultar botones de promedios al cambiar de modo (se mostrarán al ejecutar fetch)
   const btnAvg = document.getElementById('btn-dl-pa-avg');
-  if (btnAvg) btnAvg.classList.toggle('hidden', paMode !== 'list');
+  const btnHistAvg = document.getElementById('btn-dl-pa-hist-avg');
+  if (btnAvg) btnAvg.classList.add('hidden');
+  if (btnHistAvg) btnHistAvg.classList.add('hidden');
 }
 
 // Función auxiliar para formatear (puedes ponerla justo arriba de buildDataTable)
@@ -303,6 +309,66 @@ function downloadPAAverages() {
     document.body.removeChild(a);
 }
 
+function downloadPAHistoryAverages() {
+    const data = window.apiDataCache['purpleair'];
+    
+    if (!data || !data.data || !Array.isArray(data.data) || data.data.length === 0) {
+        showToast("No hay datos históricos cargados para promediar.", true);
+        return;
+    }
+
+    // Inicializamos objetos dinámicos para sumas y conteos basados en los 'fields'
+    let sums = {};
+    let counts = {};
+
+    // Excluimos campos que no tiene sentido promediar
+    const excludedFields = ['time_stamp', 'sensor_index', 'name', 'latitude', 'longitude'];
+
+    data.fields.forEach(field => {
+        if (!excludedFields.includes(field)) {
+            sums[field] = 0;
+            counts[field] = 0;
+        }
+    });
+
+    // Recorremos la matriz de datos históricos
+    data.data.forEach(sensorArray => {
+        let s = {};
+        data.fields.forEach((f, i) => s[f] = sensorArray[i]);
+        
+        // Sumamos los valores válidos
+        for (let field in sums) {
+            if (s[field] != null && typeof s[field] === 'number') {
+                sums[field] += s[field];
+                counts[field]++;
+            }
+        }
+    });
+
+    // Calculamos el promedio final
+    let averages = {
+        total_readings: data.data.length,
+        period_start: data.data[data.data.length - 1][data.fields.indexOf('time_stamp')], // PurpleAir a veces devuelve invertido
+        period_end: data.data[0][data.fields.indexOf('time_stamp')]
+    };
+
+    for (let field in sums) {
+        averages[`average_${field}`] = counts[field] > 0 
+            ? parseFloat((sums[field] / counts[field]).toFixed(2)) 
+            : null;
+    }
+
+    // Proceso de descarga
+    const now = new Date();
+    const filename = `purpleair_historical_averages_${now.toISOString().split('T')[0]}.json`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(averages, null, 2)], { type: 'application/json' }));
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
 // ==========================================
 // EJECUCIÓN HTTP (FETCH REAL)
 // ==========================================
@@ -339,6 +405,15 @@ async function executeRealRequest(api) {
     window.apiDataCache[api] = data;
     el.innerHTML = buildDataTable(api, data);
     btnDownload.classList.remove('hidden');
+    if (api === 'purpleair') {
+        const paMode = document.getElementById('pa-mode').value;
+        const btnAvg = document.getElementById('btn-dl-pa-avg');
+        const btnHistAvg = document.getElementById('btn-dl-pa-hist-avg');
+        
+        if (paMode === 'list' && btnAvg) btnAvg.classList.remove('hidden');
+        if (paMode === 'history' && btnHistAvg) btnHistAvg.classList.remove('hidden');
+    }
+
     showToast("Datos estructurados en tabla exitosamente");
 
   } catch (error) {
