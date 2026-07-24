@@ -145,6 +145,17 @@ function updateUI() {
   if (btnAvg) btnAvg.classList.toggle('hidden', paMode !== 'list');
 }
 
+// Función auxiliar para formatear (puedes ponerla justo arriba de buildDataTable)
+function formatTimestamp(ts) {
+    const d = new Date(ts * 1000);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
 function buildDataTable(api, data) {
     let rows = [];
     try {
@@ -152,20 +163,21 @@ function buildDataTable(api, data) {
             if (data.fields && data.data && Array.isArray(data.data)) {
                 if(data.data.length === 0) return `<p>Petición exitosa, pero no hay sensores reportando en esta área.</p>`;
                 
-                // Si es modo histórico, agregamos encabezado específico
-                const isHistory = data.data[0].length > 5; // Heurística simple para diferenciar lista de histórico
+                const isHistory = data.data[0].length > 5; 
                 rows.push(`<tr><th colspan="2" style="background:#334155; color:white; text-align:center;">${isHistory ? 'DATOS HISTÓRICOS' : 'SENSORES ENCONTRADOS: ' + data.data.length}</th></tr>`);
                 
                 data.data.forEach(sensorArray => {
                     let s = {};
                     data.fields.forEach((f, i) => s[f] = sensorArray[i]);
                     
-                    // Identificador de bloque
-                    const title = s.name ? `Sensor: ${s.name}` : `Time: ${s.time_stamp || 'N/A'}`;
+                    // Formatear el timestamp si existe
+                    const timeDisplay = s.time_stamp ? formatTimestamp(s.time_stamp) : 'N/A';
+                    const title = s.name ? `Sensor: ${s.name}` : `Lectura: ${timeDisplay}`;
+                    
                     rows.push(`<tr><td colspan="2" style="background:rgba(16,185,129,0.2); font-weight:bold; color:#a7f3d0;">${title}</td></tr>`);
                     
                     const dict = {
-                        "time_stamp": "Fecha/Hora (Unix)",
+                        "time_stamp": "Fecha y Hora",
                         "latitude": "Latitud", 
                         "longitude": "Longitud",
                         "pm1.0_atm": "PM 1.0 (µg/m³)", 
@@ -177,12 +189,13 @@ function buildDataTable(api, data) {
                     
                     for (let key in dict) {
                         if (s[key] !== undefined && s[key] !== null) {
-                            rows.push(`<tr><td>${dict[key]}</td><td>${s[key]}</td></tr>`);
+                            // Si la clave es el timestamp, pasamos el valor ya formateado
+                            let valorAMostrar = key === 'time_stamp' ? timeDisplay : s[key];
+                            rows.push(`<tr><td>${dict[key]}</td><td>${valorAMostrar}</td></tr>`);
                         }
                     }
                 });
             } else if (data.sensor) {
-                // MODO TIEMPO REAL (Sensor Específico)
                 const s = data.sensor;
                 const dict = {
                     "sensor_index": "ID de Estación", "latitude": "Latitud Espacial", "longitude": "Longitud Espacial", "name": "Identificador de Estación",
@@ -195,7 +208,42 @@ function buildDataTable(api, data) {
                 throw new Error("Estructura 'sensor' o 'data' no encontrada o el periodo histórico está vacío.");
             }
         } 
-        // ... (resto de la función para iqair y openaq permanece igual)
+        else if (api === 'iqair') {
+            const w = data.data.current.weather;
+            const p = data.data.current.pollution;
+            const loc = data.data.location;
+            
+            if (loc && loc.coordinates) {
+                rows.push(`<tr><td>Longitud Espacial</td><td>${loc.coordinates[0]}</td></tr>`);
+                rows.push(`<tr><td>Latitud Espacial</td><td>${loc.coordinates[1]}</td></tr>`);
+            }
+            rows.push(`<tr><td>Temperatura Ambiente (°C)</td><td>${w.tp}</td></tr>`);
+            rows.push(`<tr><td>Humedad Relativa (%)</td><td>${w.hu}</td></tr>`);
+            rows.push(`<tr><td>Presión Atmosférica (hPa)</td><td>${w.pr}</td></tr>`);
+            rows.push(`<tr><td>Velocidad del Viento (m/s)</td><td>${w.ws}</td></tr>`);
+            rows.push(`<tr><td>Índice de Calidad (AQI US)</td><td>${p.aqius}</td></tr>`);
+            rows.push(`<tr><td>Contaminante Principal</td><td>${p.mainus}</td></tr>`);
+        } 
+        else if (api === 'openaq') {
+            if (!data.results || data.results.length === 0) throw new Error("No se encontró la locación (ID inválido o sin datos recientes).");
+            
+            const locData = data.results[0];
+            rows.push(`<tr><td>ID de Estación</td><td>${locData.id}</td></tr>`);
+            rows.push(`<tr><td>Nombre de Estación</td><td>${locData.name}</td></tr>`);
+            rows.push(`<tr><td>Ciudad / País</td><td>${locData.locality || 'N/A'} / ${locData.country ? locData.country.name : 'N/A'}</td></tr>`);
+            
+            if(locData.coordinates) {
+                rows.push(`<tr><td>Latitud Espacial</td><td>${locData.coordinates.latitude}</td></tr>`);
+                rows.push(`<tr><td>Longitud Espacial</td><td>${locData.coordinates.longitude}</td></tr>`);
+            }
+            
+            if (locData.sensors && Array.isArray(locData.sensors)) {
+                locData.sensors.forEach(s => {
+                    const paramName = s.parameter ? (s.parameter.displayName || s.parameter.name) : s.name;
+                    rows.push(`<tr><td>${paramName.toUpperCase()}</td><td>Disponible (Consultar serie temporal)</td></tr>`);
+                });
+            }
+        }
     } catch(e) { return `<p class="error-text">Error transformando JSON: ${e.message}</p>`; }
 
     if (rows.length === 0) return `<p>Petición exitosa, pero no se encontraron datos válidos.</p>`;
