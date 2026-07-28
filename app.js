@@ -129,8 +129,8 @@ function buildIQ() {
 
 function buildOAQ() {
   const coords = document.getElementById('oaq-loc-dropdown').value;
-  // SOLUCIÓN OPENAQ: Búsqueda espacial (radio 25km) en V3 para evitar IDs huérfanos.
-  const url = `https://api.openaq.org/v3/locations?coordinates=${coords}&radius=25000`;
+  // Intento de bypass enviando la API Key directamente en los parámetros de la URL
+  const url = `https://api.openaq.org/v3/locations?coordinates=${coords}&radius=25000&api_key=${KEYS.OAQ}`;
   document.getElementById('oaq-url').textContent = url;
 }
 
