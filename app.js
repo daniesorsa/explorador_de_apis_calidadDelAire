@@ -128,9 +128,9 @@ function buildIQ() {
 }
 
 function buildOAQ() {
-  const id = document.getElementById('oaq-loc-dropdown').value;
-  // SOLUCIÓN OPENAQ: Uso explícito de la v3 con API Key en los headers para evitar NetworkError/410 Gone.
-  const url = `https://api.openaq.org/v3/locations/${id}`;
+  const coords = document.getElementById('oaq-loc-dropdown').value;
+  // SOLUCIÓN OPENAQ: Búsqueda espacial (radio 25km) en V3 para evitar IDs huérfanos.
+  const url = `https://api.openaq.org/v3/locations?coordinates=${coords}&radius=25000`;
   document.getElementById('oaq-url').textContent = url;
 }
 
@@ -231,24 +231,29 @@ function buildDataTable(api, data) {
             rows.push(`<tr><td>Contaminante Principal</td><td>${p.mainus}</td></tr>`);
         } 
         else if (api === 'openaq') {
-            if (!data.results || data.results.length === 0) throw new Error("No se encontró la locación (ID inválido o sin datos recientes).");
+            if (!data.results || data.results.length === 0) throw new Error("No se encontraron estaciones activas en este radio geográfico.");
             
-            const locData = data.results[0];
-            rows.push(`<tr><td>ID de Estación</td><td>${locData.id}</td></tr>`);
-            rows.push(`<tr><td>Nombre de Estación</td><td>${locData.name}</td></tr>`);
-            rows.push(`<tr><td>Ciudad / País</td><td>${locData.locality || 'N/A'} / ${locData.country ? locData.country.name : 'N/A'}</td></tr>`);
+            rows.push(`<tr><th colspan="2" style="background:#334155; color:white; text-align:center;">ESTACIONES ENCONTRADAS: ${data.results.length}</th></tr>`);
             
-            if(locData.coordinates) {
-                rows.push(`<tr><td>Latitud Espacial</td><td>${locData.coordinates.latitude}</td></tr>`);
-                rows.push(`<tr><td>Longitud Espacial</td><td>${locData.coordinates.longitude}</td></tr>`);
-            }
-            
-            if (locData.sensors && Array.isArray(locData.sensors)) {
-                locData.sensors.forEach(s => {
-                    const paramName = s.parameter ? (s.parameter.displayName || s.parameter.name) : s.name;
-                    rows.push(`<tr><td>${paramName.toUpperCase()}</td><td>Disponible (Consultar serie temporal)</td></tr>`);
-                });
-            }
+            data.results.forEach(locData => {
+                rows.push(`<tr><td colspan="2" style="background:rgba(16,185,129,0.2); font-weight:bold; color:#a7f3d0;">Estación: ${locData.name}</td></tr>`);
+                rows.push(`<tr><td>ID de Estación (V3)</td><td>${locData.id}</td></tr>`);
+                
+                const ciudad = locData.locality || 'N/A';
+                const pais = locData.country ? locData.country.name : 'N/A';
+                rows.push(`<tr><td>Ubicación</td><td>${ciudad} / ${pais}</td></tr>`);
+                
+                if(locData.coordinates) {
+                    rows.push(`<tr><td>Coordenadas</td><td>Lat: ${locData.coordinates.latitude}, Lon: ${locData.coordinates.longitude}</td></tr>`);
+                }
+                
+                if (locData.sensors && Array.isArray(locData.sensors)) {
+                    const params = locData.sensors.map(s => {
+                        return s.parameter ? (s.parameter.displayName || s.parameter.name).toUpperCase() : s.name.toUpperCase();
+                    });
+                    rows.push(`<tr><td>Parámetros Medidos</td><td>${params.join(', ')}</td></tr>`);
+                }
+            });
         }
     } catch(e) { return `<p class="error-text">Error transformando JSON: ${e.message}</p>`; }
 
