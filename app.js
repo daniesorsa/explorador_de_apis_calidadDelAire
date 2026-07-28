@@ -129,8 +129,8 @@ function buildIQ() {
 
 function buildOAQ() {
   const coords = document.getElementById('oaq-loc-dropdown').value;
-  // Intento de bypass enviando la API Key directamente en los parámetros de la URL
-  const url = `https://api.openaq.org/v3/locations?coordinates=${coords}&radius=25000&api_key=${KEYS.OAQ}`;
+  // Llamamos a la API interna de Vercel que acabamos de crear
+  const url = `/api/openaq?coordinates=${coords}`;
   document.getElementById('oaq-url').textContent = url;
 }
 
@@ -231,28 +231,26 @@ function buildDataTable(api, data) {
             rows.push(`<tr><td>Contaminante Principal</td><td>${p.mainus}</td></tr>`);
         } 
         else if (api === 'openaq') {
-            if (!data.results || data.results.length === 0) throw new Error("No se encontraron estaciones activas en este radio geográfico.");
+            if (data.error) throw new Error(data.error);
             
-            rows.push(`<tr><th colspan="2" style="background:#334155; color:white; text-align:center;">ESTACIONES ENCONTRADAS: ${data.results.length}</th></tr>`);
+            rows.push(`<tr><th colspan="2" style="background:#334155; color:white; text-align:center;">ESTACIÓN: ${data.station_name}</th></tr>`);
+            rows.push(`<tr><td>Parámetro de Medición</td><td>${data.parameter.toUpperCase()} (ID: ${data.sensor_id})</td></tr>`);
             
-            data.results.forEach(locData => {
-                rows.push(`<tr><td colspan="2" style="background:rgba(16,185,129,0.2); font-weight:bold; color:#a7f3d0;">Estación: ${locData.name}</td></tr>`);
-                rows.push(`<tr><td>ID de Estación (V3)</td><td>${locData.id}</td></tr>`);
-                
-                const ciudad = locData.locality || 'N/A';
-                const pais = locData.country ? locData.country.name : 'N/A';
-                rows.push(`<tr><td>Ubicación</td><td>${ciudad} / ${pais}</td></tr>`);
-                
-                if(locData.coordinates) {
-                    rows.push(`<tr><td>Coordenadas</td><td>Lat: ${locData.coordinates.latitude}, Lon: ${locData.coordinates.longitude}</td></tr>`);
-                }
-                
-                if (locData.sensors && Array.isArray(locData.sensors)) {
-                    const params = locData.sensors.map(s => {
-                        return s.parameter ? (s.parameter.displayName || s.parameter.name).toUpperCase() : s.name.toUpperCase();
-                    });
-                    rows.push(`<tr><td>Parámetros Medidos</td><td>${params.join(', ')}</td></tr>`);
-                }
+            // Tabla de Mediciones Originales
+            rows.push(`<tr><th colspan="2" style="background:rgba(16,185,129,0.2); font-weight:bold; color:#a7f3d0;">Mediciones Originales (Más Recientes)</th></tr>`);
+            data.original_measurements.forEach(m => {
+                const time = m.period?.datetimeTo?.utc ? formatTimestamp(new Date(m.period.datetimeTo.utc).getTime() / 1000) : 'Desconocido';
+                rows.push(`<tr><td>Tiempo Real: ${time}</td><td>${m.value} ${data.units}</td></tr>`);
+            });
+            
+            // Tabla de Datos Históricos
+            rows.push(`<tr><th colspan="2" style="background:rgba(56,189,248,0.2); font-weight:bold; color:#38bdf8;">Promedios Diarios (Históricos)</th></tr>`);
+            data.historical_averages.forEach(h => {
+                const day = h.period?.datetimeFrom?.utc ? h.period.datetimeFrom.utc.split('T')[0] : 'Desconocido';
+                const min = h.summary?.min ?? 'N/A';
+                const max = h.summary?.max ?? 'N/A';
+                const avg = h.summary?.avg ?? 'N/A';
+                rows.push(`<tr><td>Día: ${day}</td><td>Mín: ${min} | Máx: ${max} | Promedio: ${avg}</td></tr>`);
             });
         }
     } catch(e) { return `<p class="error-text">Error transformando JSON: ${e.message}</p>`; }
@@ -388,10 +386,6 @@ async function executeRealRequest(api) {
   btnDownload.classList.add('hidden'); 
 
   let options = { method: 'GET', headers: {} };
-  
-  if (api === 'openaq') {
-      options.headers['X-API-Key'] = KEYS.OAQ;
-  }
 
   try {
     const response = await fetch(url, options);
