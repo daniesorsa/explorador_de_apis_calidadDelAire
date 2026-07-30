@@ -130,11 +130,8 @@ function buildIQ() {
 function buildOAQ() {
   const coords = document.getElementById('oaq-loc-dropdown').value;
   
-  // URL de tu servidor Python en la nube. 
-  // (Para pruebas locales usa: 'http://127.0.0.1:5000')
-  const BACKEND_URL = 'https://TU-BACKEND-NUEVO.onrender.com';
-  
-  const url = `${BACKEND_URL}/api/openaq?coordinates=${coords}`;
+  // Vercel interceptará esta ruta y se la pasará a tu app.py
+  const url = `/api/openaq?coordinates=${coords}`;
   document.getElementById('oaq-url').textContent = url;
 }
 
