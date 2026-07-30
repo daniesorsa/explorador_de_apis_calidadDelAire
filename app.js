@@ -5,7 +5,7 @@
 const KEYS = { 
   PA: '865A0734-3A82-11F1-B596-4201AC1DC123', 
   IQ: 'd2f965eb-24ec-4296-bd26-6ab153f47b63', 
-  OAQ: '15440168e9f1863ef9b080ce4b171c56e5364beb8ccf3ae2971763658a909f25'
+  //OAQ: '15440168e9f1863ef9b080ce4b171c56e5364beb8ccf3ae2971763658a909f25'
 };
 
 // IQAIR_CITIES_DB eliminado (se buscará directamente por nombre y estado en la API)
@@ -129,8 +129,12 @@ function buildIQ() {
 
 function buildOAQ() {
   const coords = document.getElementById('oaq-loc-dropdown').value;
-  // Llamamos a la API interna de Vercel que acabamos de crear
-  const url = `/api/openaq?coordinates=${coords}`;
+  
+  // URL de tu servidor Python en la nube. 
+  // (Para pruebas locales usa: 'http://127.0.0.1:5000')
+  const BACKEND_URL = 'https://TU-BACKEND-NUEVO.onrender.com';
+  
+  const url = `${BACKEND_URL}/api/openaq?coordinates=${coords}`;
   document.getElementById('oaq-url').textContent = url;
 }
 
@@ -411,6 +415,29 @@ async function executeRealRequest(api) {
         
         if (paMode === 'list' && btnAvg) btnAvg.classList.remove('hidden');
         if (paMode === 'history' && btnHistAvg) btnHistAvg.classList.remove('hidden');
+    }
+    else if (api === 'openaq') {
+        if (data.error) throw new Error(data.error);
+        
+        rows.push(`<tr><th colspan="2" style="background:#334155; color:white; text-align:center;">ESTACIÓN: ${data.station_name}</th></tr>`);
+        rows.push(`<tr><td>Parámetro de Medición</td><td>${data.parameter.toUpperCase()} (ID: ${data.sensor_id})</td></tr>`);
+        
+        // Tabla de Mediciones Originales
+        rows.push(`<tr><th colspan="2" style="background:rgba(16,185,129,0.2); font-weight:bold; color:#a7f3d0;">Mediciones Originales (Más Recientes)</th></tr>`);
+        data.original_measurements.forEach(m => {
+            const time = m.period?.datetimeTo?.utc ? formatTimestamp(new Date(m.period.datetimeTo.utc).getTime() / 1000) : 'Desconocido';
+            rows.push(`<tr><td>Tiempo Real: ${time}</td><td>${m.value} ${data.units}</td></tr>`);
+        });
+        
+        // Tabla de Datos Históricos
+        rows.push(`<tr><th colspan="2" style="background:rgba(56,189,248,0.2); font-weight:bold; color:#38bdf8;">Promedios Diarios (Históricos)</th></tr>`);
+        data.historical_averages.forEach(h => {
+            const day = h.period?.datetimeFrom?.utc ? h.period.datetimeFrom.utc.split('T')[0] : 'Desconocido';
+            const min = h.summary?.min ?? 'N/A';
+            const max = h.summary?.max ?? 'N/A';
+            const avg = h.summary?.avg ?? 'N/A';
+            rows.push(`<tr><td>Día: ${day}</td><td>Mín: ${min} | Máx: ${max} | Promedio: ${avg}</td></tr>`);
+        });
     }
 
     showToast("Datos estructurados en tabla exitosamente");
